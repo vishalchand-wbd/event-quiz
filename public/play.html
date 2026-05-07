@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0064FF">
+  <title>Quiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #0064FF;
+      --brand-dark: #0050D0;
+      --bg: #ffffff;
+      --surface: #F5F7FB;
+      --text: #0E1A2B;
+      --muted: #6B7280;
+      --line: #E5E7EB;
+      --green: #15B886;
+      --red: #E5484D;
+      --shadow: 0 1px 2px rgba(14, 26, 43, 0.04), 0 4px 16px rgba(14, 26, 43, 0.06);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+      font-size: 17px;
+      line-height: 1.5;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+    }
+    body { min-height: 100dvh; display: flex; flex-direction: column; }
+
+    header {
+      background: var(--brand); color: #fff;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    header .logo { height: 28px; width: auto; filter: brightness(0) invert(1); }
+    header h1 {
+      margin: 0; font-size: 16px; font-weight: 700;
+      letter-spacing: 0.02em; text-transform: uppercase;
+    }
+    header .conn {
+      margin-left: auto; width: 8px; height: 8px;
+      border-radius: 50%; background: rgba(255,255,255,0.4);
+      transition: background 0.2s;
+    }
+    header .conn.online  { background: #4ADE80; box-shadow: 0 0 6px #4ADE80; }
+    header .conn.offline { background: #FCA5A5; }
+
+    main { flex: 1; padding: 20px 16px 32px; display: flex; flex-direction: column; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 24px 20px;
+      box-shadow: var(--shadow);
+    }
+    .center { display: flex; flex-direction: column; justify-content: center; flex: 1; }
+
+    /* Email gate */
+    .email-form { display: flex; flex-direction: column; gap: 16px; }
+    .email-form label {
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .email-form input {
+      width: 100%; padding: 16px 18px;
+      font-size: 17px; font-family: inherit;
+      border: 2px solid var(--line); border-radius: 12px;
+      background: #fff; color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .email-form input:focus { border-color: var(--brand); }
+    .email-form .err { color: var(--red); font-size: 14px; min-height: 18px; }
+
+    .btn-primary {
+      width: 100%; padding: 18px;
+      font-size: 17px; font-weight: 700; font-family: inherit;
+      background: var(--brand); color: #fff;
+      border: none; border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+    .btn-primary:active   { transform: scale(0.98); background: var(--brand-dark); }
+    .btn-primary:disabled { background: #B0BCCC; cursor: not-allowed; }
+
+    /* Lobby */
+    .lobby h2 { margin: 0 0 6px; font-size: 24px; font-weight: 800; }
+    .lobby p { margin: 0 0 20px; color: var(--muted); }
+    .lobby .pulse {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; background: var(--brand);
+      margin-right: 8px;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50%      { opacity: 1;   transform: scale(1.1); }
+    }
+
+    /* Question */
+    .qheader {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 14px;
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .timer {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      background: var(--brand); color: #fff;
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer.warn { background: var(--red); }
+    .question-text {
+      font-size: 22px; font-weight: 700; line-height: 1.3;
+      margin: 0 0 24px;
+    }
+    .options { display: flex; flex-direction: column; gap: 12px; }
+    .option {
+      width: 100%; padding: 18px 18px;
+      font-size: 17px; font-weight: 600; font-family: inherit;
+      text-align: left;
+      background: #fff; color: var(--text);
+      border: 2px solid var(--line); border-radius: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 14px;
+      transition: border-color 0.15s, background 0.15s, transform 0.05s;
+    }
+    .option:active { transform: scale(0.98); }
+    .option:hover  { border-color: var(--brand); }
+    .option .letter {
+      flex: 0 0 32px; height: 32px; border-radius: 50%;
+      background: var(--brand); color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 14px;
+    }
+    .option:disabled       { opacity: 0.5; cursor: not-allowed; }
+    .option.selected       { border-color: var(--brand); background: rgba(0,100,255,0.06); }
+
+    /* Locked */
+    .locked .icon {
+      width: 56px; height: 56px; margin: 0 auto 16px;
+      border-radius: 50%; background: var(--brand); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+    }
+    .locked h2 { margin: 0 0 8px; font-size: 22px; text-align: center; }
+    .locked p  { margin: 0; text-align: center; color: var(--muted); }
+
+    /* Reveal */
+    .reveal { text-align: center; }
+    .reveal .verdict { font-size: 28px; font-weight: 800; margin: 0 0 12px; }
+    .reveal .verdict.correct { color: var(--green); }
+    .reveal .verdict.wrong   { color: var(--red); }
+    .reveal .points {
+      font-size: 48px; font-weight: 800;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+      margin: 8px 0;
+    }
+    .reveal .stats {
+      display: flex; justify-content: space-around;
+      margin-top: 24px; padding-top: 20px;
+      border-top: 1px solid var(--line);
+    }
+    .reveal .stat .label {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .reveal .stat .value {
+      font-size: 22px; font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .reveal .correct-was {
+      margin-top: 18px; padding: 12px;
+      background: #fff; border-radius: 10px;
+      font-size: 14px; color: var(--muted);
+    }
+    .reveal .correct-was strong { color: var(--green); display: block; margin-top: 4px; }
+
+    /* Finished */
+    .finished { text-align: center; }
+    .finished h2 { margin: 0 0 24px; font-size: 28px; font-weight: 800; }
+    .finished .your-rank {
+      padding: 24px; background: var(--brand); color: #fff;
+      border-radius: 16px; margin-bottom: 24px;
+    }
+    .finished .your-rank .label {
+      font-size: 13px; opacity: 0.85;
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .finished .your-rank .rank {
+      font-size: 56px; font-weight: 800; line-height: 1; margin: 6px 0;
+    }
+    .finished .your-rank .score { font-size: 18px; font-weight: 600; }
+    .finished .top { text-align: left; }
+    .finished .top h3 {
+      font-size: 14px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin: 0 0 12px;
+    }
+    .finished .top .row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--line);
+    }
+    .finished .top .row:last-child { border-bottom: none; }
+    .finished .top .row .pos {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--surface); color: var(--text);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+    }
+    .finished .top .row .pos.gold   { background: #F4C430; color: #5B3A00; }
+    .finished .top .row .pos.silver { background: #C0C0C0; color: #2A2A2A; }
+    .finished .top .row .pos.bronze { background: #CD7F32; color: #FFF; }
+    .finished .top .row .email {
+      flex: 1; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .finished .top .row .pts {
+      font-variant-numeric: tabular-nums; font-weight: 700;
+    }
+
+    /* Reset banner — shown briefly when the host wipes the game */
+    .reset-banner {
+      padding: 12px 16px; margin-bottom: 16px;
+      background: rgba(0,100,255,0.08);
+      border: 1px solid rgba(0,100,255,0.2);
+      border-radius: 12px;
+      color: var(--brand);
+      font-size: 14px; font-weight: 600;
+      text-align: center;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="/logo.png" alt="" class="logo" onerror="this.style.display='none'">
+    <h1>Live Quiz</h1>
+    <span class="conn offline" id="conn" title="Connection status"></span>
+  </header>
+
+  <main>
+    <!-- 1. Email gate -->
+    <section id="view-email" class="card center">
+      <div id="reset-banner" class="reset-banner hidden">The game was reset by the moderator. Please rejoin.</div>
+      <form class="email-form" id="join-form">
+        <div>
+          <label for="email">Your work email</label>
+          <input type="email" id="email" name="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
+        </div>
+        <div class="err" id="email-err"></div>
+        <button class="btn-primary" type="submit" id="join-btn">Join</button>
+      </form>
+    </section>
+
+    <!-- 2. Lobby -->
+    <section id="view-lobby" class="card center hidden">
+      <div class="lobby">
+        <h2>You're in.</h2>
+        <p><span class="pulse"></span>Waiting for the moderator to start...</p>
+      </div>
+    </section>
+
+    <!-- 3. Question -->
+    <section id="view-question" class="card hidden">
+      <div class="qheader">
+        <span id="q-counter">Question 1 of 10</span>
+        <span class="timer" id="q-timer">--</span>
+      </div>
+      <h2 class="question-text" id="q-text">…</h2>
+      <div class="options" id="q-options"></div>
+    </section>
+
+    <!-- 4. Answer locked -->
+    <section id="view-locked" class="card center hidden">
+      <div class="locked">
+        <div class="icon">✓</div>
+        <h2>Answer locked in</h2>
+        <p>Waiting for the reveal…</p>
+      </div>
+    </section>
+
+    <!-- 5. Reveal -->
+    <section id="view-reveal" class="card center hidden">
+      <div class="reveal">
+        <div class="verdict" id="r-verdict">…</div>
+        <div class="points" id="r-points">+0</div>
+        <div class="correct-was hidden" id="r-correct-was">
+          The correct answer was <strong id="r-correct-text">…</strong>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Total Score</div>
+            <div class="value" id="r-total">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Rank</div>
+            <div class="value" id="r-rank">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Finished -->
+    <section id="view-finished" class="card hidden">
+      <div class="finished">
+        <h2>Game Over</h2>
+        <div class="your-rank">
+          <div class="label">Your rank</div>
+          <div class="rank" id="f-rank">—</div>
+          <div class="score" id="f-score">0 points</div>
+        </div>
+        <div class="top">
+          <h3>Top 5</h3>
+          <div id="f-top"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    'use strict';
+
+    // ===== View management =====
+    const views = {
+      email:    document.getElementById('view-email'),
+      lobby:    document.getElementById('view-lobby'),
+      question: document.getElementById('view-question'),
+      locked:   document.getElementById('view-locked'),
+      reveal:   document.getElementById('view-reveal'),
+      finished: document.getElementById('view-finished'),
+    };
+    function showView(name) {
+      Object.entries(views).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));
+    }
+
+    let myEmail = null;
+    let currentQIndex = -1;
+    let timerInterval = null;
+    let resetBannerTimer = null;
+    const conn = document.getElementById('conn');
+    const resetBanner = document.getElementById('reset-banner');
+
+    // ===== Socket.IO =====
+    const socket = io({
+      transports: ['websocket'],
+      auth: { role: 'player' },
+    });
+
+    socket.on('connect', () => {
+      conn.classList.remove('offline'); conn.classList.add('online');
+      // Re-join after a transport reconnect (server applyEvent is idempotent on duplicate joins).
+      // Note: after a server-initiated reset, myEmail is already null here, so we
+      // correctly DO NOT auto-rejoin — we let the user re-enter the email gate.
+      if (myEmail) socket.emit('player:join', { email: myEmail }, () => {});
+    });
+    socket.on('disconnect', () => {
+      conn.classList.remove('online'); conn.classList.add('offline');
+    });
+    socket.on('error', (err) => console.error('server error:', err));
+
+    // ===== Email gate =====
+    const joinForm = document.getElementById('join-form');
+    const emailInput = document.getElementById('email');
+    const joinBtn = document.getElementById('join-btn');
+    const emailErr = document.getElementById('email-err');
+
+    joinForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      emailErr.textContent = '';
+      // User is interacting with the form again — hide any leftover reset banner.
+      hideResetBanner();
+      const email = emailInput.value.trim().toLowerCase();
+      if (!email || !email.includes('@')) {
+        emailErr.textContent = 'Please enter a valid email.';
+        return;
+      }
+      joinBtn.disabled = true;
+      joinBtn.textContent = 'Joining…';
+      socket.emit('player:join', { email }, (ack) => {
+        joinBtn.disabled = false;
+        joinBtn.textContent = 'Join';
+        if (!ack || !ack.ok) {
+          emailErr.textContent = (ack && ack.error) || 'Could not join.';
+          return;
+        }
+        myEmail = email;
+        // Server will follow up with state:lobby / state:question / etc.
+      });
+    });
+
+    // ===== State events =====
+
+    socket.on('state:lobby', () => {
+      if (!myEmail) return;
+      showView('lobby');
+    });
+
+    socket.on('state:question', (q) => {
+      if (!myEmail) return;
+      currentQIndex = q.index;
+
+      document.getElementById('q-counter').textContent = `Question ${q.index + 1} of ${q.total}`;
+      document.getElementById('q-text').textContent = q.text;
+
+      const optionsEl = document.getElementById('q-options');
+      optionsEl.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'option';
+        btn.innerHTML = `<span class="letter">${letters[i]}</span><span>${escapeHtml(opt)}</span>`;
+        btn.addEventListener('click', () => submitAnswer(i, btn));
+        optionsEl.appendChild(btn);
+      });
+
+      // Local timer display only — the server is authoritative on close.
+      // Adjust for clock skew so users with a wrong system clock still see ~accurate countdown.
+      const skewMs = Date.now() - q.serverNow;
+      startTimer(q.endsAt + skewMs);
+
+      showView('question');
+    });
+
+    function submitAnswer(option, btnEl) {
+      const all = document.querySelectorAll('#q-options .option');
+      all.forEach((b) => { b.disabled = true; });
+      btnEl.classList.add('selected');
+
+      socket.emit('player:answer', { qIndex: currentQIndex, option }, (ack) => {
+        if (!ack || !ack.ok) {
+          all.forEach((b) => { b.disabled = false; });
+          btnEl.classList.remove('selected');
+          console.warn('answer rejected:', ack && ack.error);
+          // Self-heal if the server lost our session (typically because the
+          // host issued a reset between us seeing the question and answering).
+          // Bail to the email gate so the player can rejoin cleanly.
+          if (ack && (ack.error === 'Not joined' || ack.error === 'Unknown player')) {
+            myEmail = null;
+            stopTimer();
+            showResetBanner();
+            showView('email');
+          }
+          return;
+        }
+        stopTimer();
+        showView('locked');
+      });
+    }
+
+    socket.on('state:reveal', (r) => {
+      if (!myEmail) return;
+      stopTimer();
+
+      const yr = r.yourResult || {};
+      const verdictEl     = document.getElementById('r-verdict');
+      const pointsEl      = document.getElementById('r-points');
+      const totalEl       = document.getElementById('r-total');
+      const rankEl        = document.getElementById('r-rank');
+      const correctWasEl  = document.getElementById('r-correct-was');
+      const correctTextEl = document.getElementById('r-correct-text');
+
+      if (yr.correct) {
+        verdictEl.textContent = 'Correct!';
+        verdictEl.className = 'verdict correct';
+        pointsEl.textContent = '+' + (yr.pointsAwarded || 0);
+        correctWasEl.classList.add('hidden');
+      } else {
+        verdictEl.textContent = (yr.yourOption == null) ? 'No answer' : 'Incorrect';
+        verdictEl.className = 'verdict wrong';
+        pointsEl.textContent = '+0';
+        correctTextEl.textContent = r.options ? r.options[r.correctOption] : '';
+        correctWasEl.classList.remove('hidden');
+      }
+      totalEl.textContent = (yr.totalScore || 0).toLocaleString();
+      rankEl.textContent  = yr.rank ? '#' + yr.rank : '—';
+
+      showView('reveal');
+    });
+
+    socket.on('state:finished', (f) => {
+      if (!myEmail) return;
+      stopTimer();
+      const podium = f.podium || [];
+      const myEntry = podium.find((p) => p.email === myEmail);
+      const myRank = myEntry ? podium.indexOf(myEntry) + 1 : null;
+
+      document.getElementById('f-rank').textContent = myRank ? '#' + myRank : 'Top 5: not listed';
+      document.getElementById('f-score').textContent = (myEntry ? myEntry.score : 0).toLocaleString() + ' points';
+
+      const topEl = document.getElementById('f-top');
+      topEl.innerHTML = '';
+      podium.slice(0, 5).forEach((p, i) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const posClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+        row.innerHTML =
+          `<span class="pos ${posClass}">${i + 1}</span>` +
+          `<span class="email">${escapeHtml(p.email)}</span>` +
+          `<span class="pts">${p.score.toLocaleString()}</span>`;
+        topEl.appendChild(row);
+      });
+
+      showView('finished');
+    });
+
+    // ===== Reset event =====
+    // Host wiped the game from the moderator console. Drop our session and put
+    // the user back at the email gate. The server has already cleared our
+    // socket.data.email server-side, so no further server messages will arrive
+    // for us until we re-join via player:join.
+    socket.on('state:reset', () => {
+      myEmail = null;
+      currentQIndex = -1;
+      stopTimer();
+      // Reset the email form so the user starts clean.
+      emailInput.value = '';
+      emailErr.textContent = '';
+      joinBtn.disabled = false;
+      joinBtn.textContent = 'Join';
+      showResetBanner();
+      showView('email');
+    });
+
+    function showResetBanner() {
+      resetBanner.classList.remove('hidden');
+      if (resetBannerTimer) clearTimeout(resetBannerTimer);
+      // Auto-hide after 6s so the message doesn't linger forever.
+      resetBannerTimer = setTimeout(() => resetBanner.classList.add('hidden'), 6000);
+    }
+    function hideResetBanner() {
+      resetBanner.classList.add('hidden');
+      if (resetBannerTimer) { clearTimeout(resetBannerTimer); resetBannerTimer = null; }
+    }
+
+    // ===== Timer helpers =====
+    function startTimer(endsAtLocalMs) {
+      stopTimer();
+      const el = document.getElementById('q-timer');
+      function tick() {
+        const remaining = Math.max(0, endsAtLocalMs - Date.now());
+        const sec = Math.ceil(remaining / 1000);
+        el.textContent = sec + 's';
+        el.classList.toggle('warn', sec <= 5);
+        if (remaining <= 0) stopTimer();
+      }
+      tick();
+      timerInterval = setInterval(tick, 200);
+    }
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

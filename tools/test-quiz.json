@@ -1,0 +1,23 @@
+{
+  "title": "Load test quiz (5s per question)",
+  "questions": [
+    {
+      "text": "Load test question 1",
+      "options": ["A", "B", "C", "D"],
+      "correctOption": 0,
+      "durationMs": 5000
+    },
+    {
+      "text": "Load test question 2",
+      "options": ["A", "B", "C", "D"],
+      "correctOption": 1,
+      "durationMs": 5000
+    },
+    {
+      "text": "Load test question 3",
+      "options": ["A", "B", "C", "D"],
+      "correctOption": 2,
+      "durationMs": 5000
+    }
+  ]
+}

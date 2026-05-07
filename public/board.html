@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz — Big Screen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #0064FF;
+      --brand-glow: rgba(0,100,255,0.55);
+      --bg: #07090F;
+      --bg-2: #0E121C;
+      --surface: #161B26;
+      --line: #232A3A;
+      --text: #F4F6FA;
+      --muted: #9AA4B8;
+      --green: #22C58A;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      height: 100vh; overflow: hidden;
+      background: var(--bg); color: var(--text);
+      font-family: 'Manrope', system-ui, sans-serif;
+      font-feature-settings: "ss01", "ss02";
+    }
+    body {
+      background:
+        radial-gradient(ellipse at top left, rgba(0,100,255,0.10), transparent 60%),
+        radial-gradient(ellipse at bottom right, rgba(0,100,255,0.06), transparent 50%),
+        var(--bg);
+    }
+
+    /* Top bar */
+    .topbar {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 22px 36px;
+      display: flex; align-items: center; gap: 16px;
+      z-index: 10;
+    }
+    .topbar .logo  { height: 36px; filter: brightness(0) invert(1); opacity: 0.95; }
+    .topbar h1 {
+      margin: 0; font-size: 18px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      opacity: 0.9;
+    }
+    .topbar .meta {
+      margin-left: auto;
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    /* Layout container — switches structure per state */
+    .stage {
+      position: absolute; inset: 0;
+      padding: 100px 60px 60px;
+      display: flex; flex-direction: column;
+    }
+
+    /* ============== LOBBY ============== */
+    .lobby {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 60px;
+      align-items: center;
+    }
+    .lobby .left .kicker {
+      font-size: 18px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--brand);
+    }
+    .lobby .left h2 {
+      margin: 14px 0 32px;
+      font-size: clamp(60px, 8vw, 132px);
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: -0.03em;
+    }
+    .lobby .left .url {
+      display: inline-block;
+      padding: 18px 28px;
+      background: rgba(0,100,255,0.12);
+      border: 2px solid var(--brand);
+      border-radius: 16px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: clamp(20px, 1.8vw, 32px);
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: -0.01em;
+    }
+    .lobby .right {
+      display: flex; flex-direction: column; align-items: center; gap: 36px;
+    }
+    .lobby .qr-wrap {
+      width: clamp(220px, 30vw, 380px);
+      aspect-ratio: 1 / 1;
+      background: #fff;
+      border-radius: 24px;
+      padding: 18px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 20px 60px rgba(0,100,255,0.25);
+    }
+    .lobby .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
+    .lobby .qr-wrap #qr-target { width: 100%; height: 100%; }
+    /* qrcodejs renders an <img> + a <canvas> fallback. Show the img, hide the canvas. */
+    .lobby .qr-wrap #qr-target img { width: 100% !important; height: 100% !important; display: block; }
+    .lobby .qr-wrap #qr-target canvas { display: none !important; }
+    .lobby .qr-wrap .placeholder {
+      color: #5C6479; font-size: 14px; text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .lobby .player-counter {
+      text-align: center;
+    }
+    .lobby .player-counter .label {
+      font-size: 14px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.12em;
+    }
+    .lobby .player-counter .num {
+      font-size: clamp(72px, 9vw, 144px);
+      font-weight: 900;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.04em;
+      background: linear-gradient(180deg, #fff 0%, #6C8EFF 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* ============== QUESTION ============== */
+    .question {
+      flex: 1;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 32px;
+    }
+    .question .qmeta {
+      display: flex; align-items: center; gap: 24px;
+      font-size: 16px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .question .qmeta .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--brand); box-shadow: 0 0 12px var(--brand-glow);
+      animation: livepulse 1.4s ease-in-out infinite;
+    }
+    @keyframes livepulse {
+      0%, 100% { opacity: 0.5; transform: scale(0.85); }
+      50%      { opacity: 1;   transform: scale(1.15); }
+    }
+    .question h2.q-text {
+      margin: 0;
+      font-size: clamp(40px, 5.2vw, 96px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+    }
+    .question .opts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .question .opt {
+      display: flex; align-items: center; gap: 22px;
+      padding: 22px 28px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      font-size: clamp(20px, 2.2vw, 36px);
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .question .opt .letter {
+      flex: 0 0 56px; height: 56px; border-radius: 50%;
+      background: var(--brand); color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 22px;
+    }
+    .question .footer {
+      display: flex; justify-content: space-between; align-items: end;
+    }
+    .question .answers, .question .timer-block {
+      display: flex; flex-direction: column;
+    }
+    .question .label {
+      font-size: 14px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px;
+    }
+    .question .big-num {
+      font-size: clamp(60px, 7vw, 112px);
+      font-weight: 900; line-height: 1;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
+    }
+    .question .big-num .of {
+      color: var(--muted);
+      font-size: 0.5em;
+      font-weight: 700;
+    }
+    .question .timer-block { text-align: right; }
+    .question .timer-num.warn {
+      color: #FF6B6B;
+      animation: warnpulse 0.7s ease-in-out infinite;
+    }
+    @keyframes warnpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+    /* ============== REVEAL ============== */
+    .reveal {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 48px;
+    }
+    .reveal .chart-side {
+      display: flex; flex-direction: column;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 32px;
+    }
+    .reveal .chart-side .q-text {
+      margin: 0 0 6px;
+      font-size: clamp(20px, 2vw, 30px);
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .reveal .chart-side .pct {
+      margin: 8px 0 22px;
+      font-size: 18px; font-weight: 700;
+      color: var(--green);
+      letter-spacing: 0.02em;
+    }
+    .reveal .chart-side .pct .big {
+      font-size: 44px;
+      font-variant-numeric: tabular-nums;
+    }
+    .reveal .chart-wrap {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+    }
+    .reveal .leader-side {
+      display: flex; flex-direction: column;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 32px;
+    }
+    .reveal .leader-side h3 {
+      margin: 0 0 18px;
+      font-size: 18px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .reveal .leader-row {
+      display: flex; align-items: center; gap: 18px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.02);
+    }
+    .reveal .leader-row .pos {
+      flex: 0 0 44px; height: 44px; border-radius: 50%;
+      background: var(--surface); color: var(--text);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 18px;
+    }
+    .reveal .leader-row .email {
+      flex: 1;
+      font-size: clamp(16px, 1.4vw, 22px);
+      font-weight: 700;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .reveal .leader-row .pts {
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+      font-size: clamp(18px, 1.5vw, 26px);
+      color: var(--brand);
+    }
+
+    /* ============== FINISHED ============== */
+    .finished { flex: 1; display: flex; flex-direction: column; align-items: center; }
+    .finished h2 {
+      margin: 0 0 48px;
+      font-size: clamp(48px, 6vw, 104px);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      background: linear-gradient(180deg, #fff 0%, #6C8EFF 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .finished .podium {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 24px;
+      align-items: end;
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 56px;
+    }
+    .finished .pillar {
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+      padding: 28px 18px;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 20px 20px 0 0;
+      text-align: center;
+    }
+    .finished .pillar .medal {
+      font-size: 56px; line-height: 1; margin-bottom: 6px;
+    }
+    .finished .pillar .email {
+      font-size: clamp(18px, 1.5vw, 24px);
+      font-weight: 800;
+      max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .finished .pillar .score {
+      font-size: clamp(28px, 3vw, 52px);
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      color: var(--brand);
+    }
+    .finished .pillar.gold   { padding-bottom: 64px; border-color: #F4C430; }
+    .finished .pillar.silver { padding-bottom: 40px; border-color: #C0C0C0; }
+    .finished .pillar.bronze { padding-bottom: 28px; border-color: #CD7F32; }
+    .finished .also-rans {
+      width: 100%; max-width: 720px;
+    }
+    .finished .also-rans .row {
+      display: flex; align-items: center; gap: 18px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      font-size: 22px;
+    }
+    .finished .also-rans .row .pos {
+      flex: 0 0 36px;
+      font-weight: 800; color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .finished .also-rans .row .email { flex: 1; font-weight: 700; }
+    .finished .also-rans .row .pts {
+      font-variant-numeric: tabular-nums; font-weight: 800; color: var(--brand);
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <img src="/logo.png" alt="" class="logo" onerror="this.style.display='none'">
+    <h1>Live Quiz</h1>
+    <div class="meta" id="topmeta"></div>
+  </div>
+
+  <!-- ============== LOBBY ============== -->
+  <div class="stage" id="stage-lobby">
+    <div class="lobby">
+      <div class="left">
+        <div class="kicker">Scan to play</div>
+        <h2>Join the<br>Quiz</h2>
+        <div class="url" id="join-url">https://quizs.live/play</div>
+      </div>
+      <div class="right">
+        <div class="qr-wrap">
+          <div id="qr-target"></div>
+        </div>
+        <div class="player-counter">
+          <div class="label">Players Joined</div>
+          <div class="num" id="lobby-count">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== QUESTION ============== -->
+  <div class="stage hidden" id="stage-question">
+    <div class="question">
+      <div class="qmeta">
+        <span class="dot"></span>
+        <span id="q-counter">Question 1 of 10</span>
+      </div>
+      <h2 class="q-text" id="q-text">…</h2>
+      <div class="opts" id="q-opts"></div>
+      <div class="footer">
+        <div class="answers">
+          <div class="label">Answers in</div>
+          <div class="big-num"><span id="ans-count">0</span><span class="of"> / <span id="ans-total">0</span></span></div>
+        </div>
+        <div class="timer-block">
+          <div class="label">Time left</div>
+          <div class="big-num"><span class="timer-num" id="q-timer">--</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== REVEAL ============== -->
+  <div class="stage hidden" id="stage-reveal">
+    <div class="reveal">
+      <div class="chart-side">
+        <h3 class="q-text" id="r-q-text">…</h3>
+        <div class="pct"><span class="big" id="r-pct">0</span>% answered correctly</div>
+        <div class="chart-wrap">
+          <canvas id="reveal-chart"></canvas>
+        </div>
+      </div>
+      <div class="leader-side">
+        <h3>Top 5 — Live</h3>
+        <div id="leader-rows"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== FINISHED ============== -->
+  <div class="stage hidden" id="stage-finished">
+    <div class="finished">
+      <h2>Final Standings</h2>
+      <div class="podium" id="podium"></div>
+      <div class="also-rans" id="also-rans"></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    'use strict';
+
+    // ===== Stage management =====
+    const stages = {
+      lobby:    document.getElementById('stage-lobby'),
+      question: document.getElementById('stage-question'),
+      reveal:   document.getElementById('stage-reveal'),
+      finished: document.getElementById('stage-finished'),
+    };
+    function showStage(name) {
+      Object.entries(stages).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));
+    }
+
+    // Render the join URL using the actual current host (so renaming the domain doesn't break this).
+    const playUrl = `${location.origin}/play`;
+    document.getElementById('join-url').textContent = playUrl;
+
+    // Render the QR code. Black-on-white for maximum scanner reliability
+    // (cheap phone cameras struggle with low-contrast or non-black QRs).
+    if (window.QRCode) {
+      new QRCode(document.getElementById('qr-target'), {
+        text: playUrl,
+        width: 480,                          // high-res so it stays sharp on big screens
+        height: 480,
+        colorDark:  '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M, // 15% recovery — fine for projector use
+      });
+    } else {
+      // QRCode library failed to load (corp firewall? cdnjs down?).
+      // Show the URL as plain text inside the QR card so people can still join.
+      const wrap = document.querySelector('.qr-wrap');
+      wrap.innerHTML = `<div class="placeholder">QR unavailable. Visit:<br><br><strong>${playUrl}</strong></div>`;
+    }
+
+    // ===== Live answer count tween =====
+    // The server emits state:answerCount up to 4× per second. Between emits we
+    // tween the number visually so it always looks "alive" rather than stutter-stepping.
+    const ansCountEl = document.getElementById('ans-count');
+    const ansTotalEl = document.getElementById('ans-total');
+    let displayedCount = 0;
+    let targetCount    = 0;
+    function tweenAnswerCount() {
+      if (displayedCount === targetCount) return;
+      // Ease toward the target — close 30% of the gap each frame.
+      const next = displayedCount + (targetCount - displayedCount) * 0.3;
+      // Snap when we're within 0.5 of the target so we don't asymptote forever.
+      displayedCount = Math.abs(next - targetCount) < 0.5 ? targetCount : next;
+      ansCountEl.textContent = Math.round(displayedCount).toLocaleString();
+    }
+    setInterval(tweenAnswerCount, 33);  // ~30fps is plenty for a counter
+
+    // ===== Socket =====
+    const socket = io({ transports: ['websocket'], auth: { role: 'board' } });
+
+    socket.on('state:lobby', (p) => {
+      document.getElementById('lobby-count').textContent = (p.playerCount || 0).toLocaleString();
+      document.getElementById('topmeta').textContent = '';
+      showStage('lobby');
+    });
+
+    socket.on('state:question', (q) => {
+      document.getElementById('q-counter').textContent = `Question ${q.index + 1} of ${q.total}`;
+      document.getElementById('q-text').textContent = q.text;
+      const optsEl = document.getElementById('q-opts');
+      optsEl.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+      q.options.forEach((opt, i) => {
+        const div = document.createElement('div');
+        div.className = 'opt';
+        div.innerHTML = `<span class="letter">${letters[i]}</span><span>${escapeHtml(opt)}</span>`;
+        optsEl.appendChild(div);
+      });
+
+      // Reset counter for the new question.
+      displayedCount = 0;
+      targetCount = 0;
+      ansCountEl.textContent = '0';
+
+      // Local timer.
+      const skewMs = Date.now() - q.serverNow;
+      startTimer(q.endsAt + skewMs);
+
+      document.getElementById('topmeta').textContent = `${q.index + 1} / ${q.total}`;
+      showStage('question');
+    });
+
+    socket.on('state:answerCount', (a) => {
+      targetCount = a.count || 0;
+      ansTotalEl.textContent = (a.total || 0).toLocaleString();
+    });
+
+    let revealChart = null;
+    socket.on('state:reveal', (r) => {
+      stopTimer();
+      document.getElementById('r-q-text').textContent = r.questionText || '';
+      document.getElementById('r-pct').textContent = (r.pctCorrect || 0);
+
+      // Bar chart — correct option in green, others in WBD blue.
+      const letters = ['A', 'B', 'C', 'D'];
+      const labels = letters.map((L, i) => `${L}. ${(r.options && r.options[i]) || ''}`);
+      const colors = labels.map((_, i) => i === r.correctOption
+        ? getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#22C58A'
+        : getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#0064FF');
+
+      if (revealChart) revealChart.destroy();
+      const ctx = document.getElementById('reveal-chart').getContext('2d');
+      revealChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: r.distribution || [0,0,0,0],
+            backgroundColor: colors,
+            borderRadius: 12,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 700, easing: 'easeOutCubic' },
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: {
+            x: {
+              ticks: {
+                color: '#F4F6FA',
+                font: { family: 'Manrope', weight: '700', size: 18 },
+              },
+              grid: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: '#9AA4B8',
+                font: { family: 'Manrope', weight: '600', size: 14 },
+                precision: 0,
+              },
+              grid: { color: 'rgba(255,255,255,0.05)' },
+            },
+          },
+        },
+      });
+
+      const lb = r.leaderboard || [];
+      const lbEl = document.getElementById('leader-rows');
+      lbEl.innerHTML = '';
+      lb.slice(0, 5).forEach((p, i) => {
+        const row = document.createElement('div');
+        row.className = 'leader-row';
+        row.innerHTML =
+          `<span class="pos">${i + 1}</span>` +
+          `<span class="email">${escapeHtml(p.email)}</span>` +
+          `<span class="pts">${p.score.toLocaleString()}</span>`;
+        lbEl.appendChild(row);
+      });
+
+      showStage('reveal');
+    });
+
+    socket.on('state:finished', (f) => {
+      stopTimer();
+      const podium = (f.podium || []).slice(0, 5);
+
+      const podiumEl = document.getElementById('podium');
+      podiumEl.innerHTML = '';
+      const medals = ['🥇', '🥈', '🥉'];
+      const classes = ['gold', 'silver', 'bronze'];
+      // Visual order: silver, gold, bronze (gold in the middle, taller).
+      const visualOrder = [1, 0, 2];
+      visualOrder.forEach((rank) => {
+        const p = podium[rank];
+        if (!p) return;
+        const div = document.createElement('div');
+        div.className = `pillar ${classes[rank]}`;
+        div.innerHTML =
+          `<div class="medal">${medals[rank]}</div>` +
+          `<div class="email">${escapeHtml(p.email)}</div>` +
+          `<div class="score">${p.score.toLocaleString()}</div>`;
+        podiumEl.appendChild(div);
+      });
+
+      const alsoEl = document.getElementById('also-rans');
+      alsoEl.innerHTML = '';
+      podium.slice(3).forEach((p, i) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML =
+          `<span class="pos">#${i + 4}</span>` +
+          `<span class="email">${escapeHtml(p.email)}</span>` +
+          `<span class="pts">${p.score.toLocaleString()}</span>`;
+        alsoEl.appendChild(row);
+      });
+
+      document.getElementById('topmeta').textContent = 'Final';
+      showStage('finished');
+    });
+
+    // ===== Reset event =====
+    // Host wiped the game from the moderator console. Tear down chart state and
+    // reset the answer-count tween. The follow-up state:lobby broadcast switches
+    // the visible stage back to the lobby/QR display.
+    socket.on('state:reset', () => {
+      stopTimer();
+      if (revealChart) {
+        revealChart.destroy();
+        revealChart = null;
+      }
+      displayedCount = 0;
+      targetCount = 0;
+      ansCountEl.textContent = '0';
+      ansTotalEl.textContent = '0';
+    });
+
+    // ===== Timer =====
+    let timerInterval = null;
+    function startTimer(endsAtLocalMs) {
+      stopTimer();
+      const el = document.getElementById('q-timer');
+      function tick() {
+        const remaining = Math.max(0, endsAtLocalMs - Date.now());
+        const sec = Math.ceil(remaining / 1000);
+        el.textContent = sec;
+        el.classList.toggle('warn', sec <= 5);
+        if (remaining <= 0) stopTimer();
+      }
+      tick();
+      timerInterval = setInterval(tick, 200);
+    }
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

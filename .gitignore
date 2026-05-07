@@ -1,0 +1,28 @@
+# Node
+node_modules/
+package-lock.json
+npm-debug.log*
+.npm/
+
+# State (runtime, lives in /var/lib/quiz/ on the VM, never in source)
+*.jsonl
+state.jsonl
+
+# Secrets (lives in /etc/quiz/ on the VM, never in source)
+*.env
+!quiz.env.example
+
+# Backups (sed -i.bak, .bak.timestamp from our deploys, editor swaps)
+*.bak
+*.bak.*
+*~
+.*.swp
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local-only test outputs
+tools/loadtest-results-*.json

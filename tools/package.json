@@ -1,0 +1,15 @@
+{
+  "name": "quiz-loadtest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Socket.IO load test for the live quiz server",
+  "scripts": {
+    "loadtest": "node loadtest.js"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

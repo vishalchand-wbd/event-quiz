@@ -1,0 +1,19 @@
+# Reverse proxy for the quiz server.
+# Caddy 2 fetches a Let's Encrypt cert automatically the first time it sees
+# a hostname in the config; no manual cert management.
+#
+# WebSocket upgrade requests pass through reverse_proxy with no extra config.
+
+quizs.live, www.quizs.live {
+    encode gzip zstd
+
+    reverse_proxy localhost:3000
+
+    log {
+        output file /var/log/caddy/quiz.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+        format console
+    }
+}

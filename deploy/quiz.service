@@ -1,0 +1,42 @@
+[Unit]
+Description=Live Quiz Server
+Documentation=https://socket.io/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=quiz
+Group=quiz
+WorkingDirectory=/opt/quiz
+ExecStart=/usr/bin/node /opt/quiz/server.js
+
+# Auto-restart on crash. RestartSec=2 keeps total downtime under the 30s SLO
+# even with a tight crash loop, while still avoiding tight-loop CPU burn.
+Restart=always
+RestartSec=2
+
+# File descriptor ceiling for this service (Socket.IO uses one fd per connection).
+LimitNOFILE=8192
+
+# Environment
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=STATE_FILE=/var/lib/quiz/state.jsonl
+# Secrets (HOST_TOKEN, ALLOWED_EMAIL_DOMAIN) are read from this file, mode 0600.
+EnvironmentFile=/etc/quiz/quiz.env
+
+# Logs go to journalctl. Tail with: sudo journalctl -u quiz -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=quiz
+
+# Lightweight hardening — restrict what a compromised process can touch.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/quiz
+
+[Install]
+WantedBy=multi-user.target
