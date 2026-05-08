@@ -131,6 +131,29 @@
       color: transparent;
     }
 
+    /* Room code display — sits below the URL on the left so people who can't
+       scan the QR can still type the bare URL and use this code to join. */
+    .lobby .left .code-display {
+      margin-top: 36px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .lobby .left .code-label {
+      font-size: 14px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.12em;
+    }
+    .lobby .left .code-value {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: clamp(72px, 9vw, 144px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.08em;
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(180deg, #fff 0%, #6C8EFF 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
     /* ============== QUESTION ============== */
     .question {
       flex: 1;
@@ -363,9 +386,13 @@
   <div class="stage" id="stage-lobby">
     <div class="lobby">
       <div class="left">
-        <div class="kicker">Scan to play</div>
+        <div class="kicker">Scan or use the code</div>
         <h2>Join the<br>Quiz</h2>
         <div class="url" id="join-url">https://quizs.live/play</div>
+        <div class="code-display">
+          <div class="code-label">Room code</div>
+          <div class="code-value" id="room-code">----</div>
+        </div>
       </div>
       <div class="right">
         <div class="qr-wrap">
@@ -448,23 +475,39 @@
     const playUrl = `${location.origin}/play`;
     document.getElementById('join-url').textContent = playUrl;
 
-    // Render the QR code. Black-on-white for maximum scanner reliability
-    // (cheap phone cameras struggle with low-contrast or non-black QRs).
-    if (window.QRCode) {
-      new QRCode(document.getElementById('qr-target'), {
-        text: playUrl,
-        width: 480,                          // high-res so it stays sharp on big screens
-        height: 480,
-        colorDark:  '#000000',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M, // 15% recovery — fine for projector use
-      });
-    } else {
-      // QRCode library failed to load (corp firewall? cdnjs down?).
-      // Show the URL as plain text inside the QR card so people can still join.
-      const wrap = document.querySelector('.qr-wrap');
-      wrap.innerHTML = `<div class="placeholder">QR unavailable. Visit:<br><br><strong>${playUrl}</strong></div>`;
+    // QR rendering is wrapped so we can re-render when the room code changes.
+    // The QR encodes the URL WITH the code as a query param (?code=XXXX) so
+    // phone scanners auto-fill the code-entry step on /play. People who can't
+    // scan can still type the bare URL and use the room code shown next to it.
+    const roomCodeEl = document.getElementById('room-code');
+    let qrCodeRendered = false;
+
+    function renderQRCode(targetUrl) {
+      const target = document.getElementById('qr-target');
+      target.innerHTML = '';     // clear any prior render so we don't stack instances
+      if (window.QRCode) {
+        new QRCode(target, {
+          text: targetUrl,
+          width: 480,                          // high-res so it stays sharp on big screens
+          height: 480,
+          colorDark:  '#000000',               // black-on-white for max scanner reliability
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M, // 15% recovery — fine for projector use
+        });
+        qrCodeRendered = true;
+      } else if (!qrCodeRendered) {
+        // QRCode library failed to load (corp firewall? cdnjs down?).
+        // Show the URL as plain text inside the QR card so people can still join.
+        const wrap = document.querySelector('.qr-wrap');
+        wrap.innerHTML = `<div class="placeholder">QR unavailable. Visit:<br><br><strong>${targetUrl}</strong></div>`;
+      }
     }
+
+    // Render immediately with the bare URL as a defensive fallback. The server
+    // will follow up with state:meta containing the actual code, at which point
+    // we re-render with the code embedded. The initial flash is barely visible
+    // because state:meta is the first message after the WebSocket handshake.
+    renderQRCode(playUrl);
 
     // ===== Live answer count tween =====
     // The server emits state:answerCount up to 4× per second. Between emits we
@@ -485,6 +528,16 @@
 
     // ===== Socket =====
     const socket = io({ transports: ['websocket'], auth: { role: 'board' } });
+
+    // state:meta carries the active room code. The server sends it on connect
+    // and rebroadcasts it after host:reset (which rotates the code). When it
+    // arrives, update the displayed code and re-render the QR so it encodes
+    // the code as a query param (saves phone users a tap).
+    socket.on('state:meta', (m) => {
+      if (!m || !m.code) return;
+      roomCodeEl.textContent = m.code;
+      renderQRCode(`${playUrl}?code=${m.code}`);
+    });
 
     socket.on('state:lobby', (p) => {
       document.getElementById('lobby-count').textContent = (p.playerCount || 0).toLocaleString();
