@@ -29,8 +29,17 @@
  * Late-join rules:
  *   - NEW players joining when state != LOBBY → rejected with GAME_STARTED
  *   - EXISTING players (already in game.players from lobby) → allowed to rejoin
- *     from any state. They get snapped to the current state. Handles network
- *     drops, page refreshes, browser restarts mid-game.
+ *     from any state. They get snapped to the current state.
+ *
+ * Player identity:
+ *   - Email is the canonical identity (lookups, idempotency, late-join check).
+ *   - firstName (required) and lastName (optional) are stored alongside but
+ *     are display-only — the UI shows names instead of email everywhere.
+ *   - Validation accepts Unicode letters + diacritics + standard name
+ *     punctuation; max 40 chars per field after trimming.
+ *   - player:join error codes (client maps these to user-facing copy):
+ *       INVALID_CODE, GAME_STARTED, EMAIL_DOMAIN,
+ *       FIRST_NAME_REQUIRED, INVALID_FIRST_NAME, INVALID_LAST_NAME
  */
 
 const http = require('http');
@@ -111,16 +120,13 @@ const game = {
   currentIndex: -1,           // index of the current question (-1 = no question yet)
   currentStartedAt: null,     // server timestamp (ms) when current question started
   currentEndsAt: null,        // server timestamp (ms) when current question's timer expires
-  players: new Map(),         // email -> { email, joinedAt, score, answers: Map<qIndex, record> }
+  players: new Map(),         // email -> { email, firstName, lastName, joinedAt, score, answers: Map }
   currentAnswers: new Map(),  // email -> answer record, JUST for the current question
   closeTimer: null,           // setTimeout handle for auto-close on timer expiry
 };
 
 // =====================================================================
 // ROOM CODE
-//
-// 4-digit numeric code (1000-9999). Persisted via the room_code_set event so
-// it survives crash + replay. Rotated on host:reset.
 // =====================================================================
 
 function generateRoomCode() {
@@ -169,14 +175,22 @@ function getRankFor(email) {
 function applyEvent(event) {
   switch (event.type) {
     case 'join': {
-      // Players are keyed by email. Re-joining = no-op (keeps existing score).
-      if (!game.players.has(event.email)) {
+      // Players are keyed by email. Re-joining = no-op for the player record
+      // overall, but we backfill names if the existing record was created
+      // under an older schema (pre-A1) and they're rejoining with names.
+      const existing = game.players.get(event.email);
+      if (!existing) {
         game.players.set(event.email, {
           email: event.email,
+          firstName: event.firstName || '',
+          lastName: event.lastName || '',
           joinedAt: event.ts,
           score: 0,
           answers: new Map(),
         });
+      } else {
+        if (!existing.firstName && event.firstName) existing.firstName = event.firstName;
+        if (!existing.lastName && event.lastName) existing.lastName = event.lastName;
       }
       break;
     }
@@ -231,9 +245,6 @@ function applyEvent(event) {
     }
 
     case 'reset': {
-      // Wipe ALL logical game state back to a freshly-booted lobby.
-      // roomCode is rotated separately by hostReset() via a fresh
-      // room_code_set event, so applyEvent's reset case stays narrow.
       game.state = STATE.LOBBY;
       game.currentIndex = -1;
       game.currentStartedAt = null;
@@ -377,9 +388,6 @@ function sendCurrentStateTo(socket) {
   // /board) need it to render the lobby header regardless of game phase.
   socket.emit('state:meta', { code: game.roomCode });
 
-  // Then snap this socket to whatever state the game is in right now. This
-  // is also the path used when an existing player rejoins mid-game — they
-  // immediately see whatever question/reveal/finished screen is current.
   switch (game.state) {
     case STATE.LOBBY:
       socket.emit('state:lobby', { playerCount: game.players.size });
@@ -577,11 +585,23 @@ const io = new Server(httpServer, {
 });
 
 // =====================================================================
-// EMAIL VALIDATION
+// EMAIL & NAME VALIDATION
 // =====================================================================
 
 const escapedDomain = ALLOWED_EMAIL_DOMAIN.replace(/\./g, '\\.');
 const EMAIL_REGEX = new RegExp(`^[A-Za-z0-9._%+-]+@${escapedDomain}$`, 'i');
+
+// Names: allow letters from any script (\p{L}), combining marks for diacritics
+// (\p{M}), space, hyphen, ASCII apostrophe, curly apostrophe (U+2019), period.
+// This lets through O'Brien, García, Müller, D'Souza, St. John, Anne-Marie,
+// देवी, محمد, 王明 etc., while rejecting digits, punctuation, emoji, etc.
+// Length 1-40 chars after trimming.
+const NAME_REGEX = /^[\p{L}\p{M}\s\-'\u2019.]+$/u;
+
+function isValidName(s) {
+  if (typeof s !== 'string') return false;
+  return s.length >= 1 && s.length <= 40 && NAME_REGEX.test(s);
+}
 
 // =====================================================================
 // SOCKET HANDLERS
@@ -605,8 +625,8 @@ io.on('connection', (socket) => {
     sendCurrentStateTo(socket);
   } else {
     socket.data.role = 'player';
-    // Send the room code immediately so the player UI can pre-validate input
-    // before they bother filling out email + code.
+    // Send the room code immediately so the player UI can render header info
+    // before they bother filling out the join form.
     socket.emit('state:meta', { code: game.roomCode });
   }
 
@@ -623,29 +643,46 @@ io.on('connection', (socket) => {
       return safeAck(ack, { ok: false, error: 'INVALID_CODE' });
     }
 
-    // 2. Email must match the allowed domain.
+    // 2. Email must match the allowed domain. Client renders the user-facing
+    //    copy (so corp wording can change without a server push).
     const email = String((payload && payload.email) || '').trim().toLowerCase();
     if (!EMAIL_REGEX.test(email)) {
-      return safeAck(ack, { ok: false, error: `Email must end in @${ALLOWED_EMAIL_DOMAIN}` });
+      return safeAck(ack, { ok: false, error: 'EMAIL_DOMAIN' });
     }
 
-    // 3. Late-join rule: if the game is past LOBBY, only EXISTING players
-    //    (those who joined during lobby) are allowed back in. This handles
-    //    network drops / refreshes / browser restarts mid-game. Genuinely
-    //    new players who didn't join during lobby are bounced.
+    // 3. Names. firstName required, lastName optional. Both subject to the
+    //    NAME_REGEX char allowlist and 40-char length cap. We trim before
+    //    validating so leading/trailing whitespace isn't a footgun.
+    const firstName = String((payload && payload.firstName) || '').trim();
+    const lastName = String((payload && payload.lastName) || '').trim();
+
+    if (!firstName) {
+      return safeAck(ack, { ok: false, error: 'FIRST_NAME_REQUIRED' });
+    }
+    if (!isValidName(firstName)) {
+      return safeAck(ack, { ok: false, error: 'INVALID_FIRST_NAME' });
+    }
+    if (lastName && !isValidName(lastName)) {
+      return safeAck(ack, { ok: false, error: 'INVALID_LAST_NAME' });
+    }
+
+    // 4. Late-join rule: if past LOBBY, only EXISTING players are allowed
+    //    back in (network drops / refreshes / browser restarts mid-game).
+    //    Genuinely new players who didn't join during lobby are bounced.
     if (game.state !== STATE.LOBBY && !game.players.has(email)) {
       return safeAck(ack, { ok: false, error: 'GAME_STARTED' });
     }
 
     socket.data.email = email;
-    // Persist the join (idempotent — duplicate joins for same email are no-ops in applyEvent).
-    recordAndPersist({ type: 'join', ts: Date.now(), email });
+    // Persist with names. applyEvent's join case is idempotent on repeat
+    // joins for the same email (and backfills names if absent on the
+    // existing record — see applyEvent for the upgrade-path logic).
+    recordAndPersist({ type: 'join', ts: Date.now(), email, firstName, lastName });
 
     safeAck(ack, { ok: true });
 
     // Snap this socket to the current game state — works for both lobby
-    // joins and mid-game rejoins. sendCurrentStateTo emits the right event
-    // for whatever phase we're in.
+    // joins and mid-game rejoins.
     sendCurrentStateTo(socket);
 
     // Refresh the lobby count for everyone (only meaningful in LOBBY state).
