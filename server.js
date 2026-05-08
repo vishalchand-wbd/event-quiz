@@ -314,7 +314,8 @@ function buildRevealPayload() {
     distribution,
     totalAnswered,
     pctCorrect,
-    leaderboard: getLeaderboard(5),
+    // Top 10 for /board's larger leader-side card. /host slices to 5 client-side.
+    leaderboard: getLeaderboard(10),
   };
 }
 
