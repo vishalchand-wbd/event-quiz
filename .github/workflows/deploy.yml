@@ -1,0 +1,85 @@
+name: Deploy to VM
+
+# Push to main = auto-deploy production.
+# Push to redesign does NOT auto-deploy — use workflow_dispatch to test redesign
+# on the VM only when you mean to. Keeps work-in-progress out of the live demo.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or tag to deploy (default: main)'
+        required: true
+        default: 'main'
+
+# Don't let two deploys race each other if you push twice in quick succession.
+# Queue them; let each finish.
+concurrency:
+  group: deploy-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # For workflow_dispatch, deploy whatever branch was selected.
+          # For push, deploy the pushed ref (main).
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Syntax-check server.js
+        run: node --check server.js
+
+      - name: Install SSH key
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Trust the VM's SSH host key on first contact (TOFU).
+          # The VM IP is stable; acceptable for our threat model.
+          ssh-keyscan -H quizs.live >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Rsync project files to VM staging directory
+        run: |
+          rsync -avz --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='node_modules/' \
+            --exclude='.npm/' \
+            --exclude='*.bak' \
+            --exclude='*.bak.*' \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
+            ./ \
+            azureuser@quizs.live:/home/azureuser/quiz-deploy/
+
+      - name: Apply staging to /opt/quiz and restart service
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
+              azureuser@quizs.live <<'REMOTE'
+          set -e
+          sudo /usr/bin/rsync -av --delete /home/azureuser/quiz-deploy/ /opt/quiz/
+          sudo /usr/bin/chown -R quiz:quiz /opt/quiz
+          sudo /usr/bin/systemctl restart quiz.service
+          sleep 3
+          sudo /usr/bin/systemctl is-active quiz.service
+          REMOTE
+
+      - name: Verify health endpoint
+        run: |
+          # Give the service a moment to bind the port after restart
+          sleep 2
+          curl -fsS https://quizs.live/health
+          echo
