@@ -292,7 +292,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       font-weight: 800; font-size: 18px;
     }
-    .reveal .leader-row .email {
+    .reveal .leader-row .name {
       flex: 1;
       font-size: clamp(16px, 1.4vw, 22px);
       font-weight: 700;
@@ -303,6 +303,15 @@
       font-weight: 800;
       font-size: clamp(18px, 1.5vw, 26px);
       color: var(--brand);
+    }
+    /* Empty-state placeholder for the leader-side card. Shown when there are
+       no players yet (defensive — in practice the reveal stage only appears
+       after at least one question, but the card shouldn't look broken if
+       somehow nobody has joined). */
+    .reveal .leader-side .empty {
+      padding: 24px 16px;
+      color: var(--muted); font-style: italic;
+      font-size: 16px; text-align: center;
     }
 
     /* ============== FINISHED ============== */
@@ -337,7 +346,7 @@
     .finished .pillar .medal {
       font-size: 56px; line-height: 1; margin-bottom: 6px;
     }
-    .finished .pillar .email {
+    .finished .pillar .name {
       font-size: clamp(18px, 1.5vw, 24px);
       font-weight: 800;
       max-width: 100%;
@@ -366,9 +375,16 @@
       font-weight: 800; color: var(--muted);
       font-variant-numeric: tabular-nums;
     }
-    .finished .also-rans .row .email { flex: 1; font-weight: 700; }
+    .finished .also-rans .row .name { flex: 1; font-weight: 700; }
     .finished .also-rans .row .pts {
       font-variant-numeric: tabular-nums; font-weight: 800; color: var(--brand);
+    }
+    /* Empty-state placeholder for the podium when nobody played. Defensive. */
+    .finished .empty {
+      padding: 36px 0;
+      color: var(--muted); font-style: italic;
+      font-size: clamp(18px, 1.6vw, 24px);
+      text-align: center;
     }
 
     .hidden { display: none !important; }
@@ -469,6 +485,19 @@
     };
     function showStage(name) {
       Object.entries(stages).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));
+    }
+
+    // displayName(p) — render the player's name from the server payload.
+    // Falls back to "—" if name fields are absent. This shouldn't happen
+    // post-A1 (server validates firstName as required on join), but a JSONL
+    // replay of pre-A1 events could still produce records without names.
+    // We deliberately do NOT fall back to email — names-only per spec.
+    function displayName(p) {
+      if (!p) return '—';
+      const first = (p.firstName || '').trim();
+      const last  = (p.lastName  || '').trim();
+      const full = (first + ' ' + last).trim();
+      return full || '—';
     }
 
     // Render the join URL using the actual current host (so renaming the domain doesn't break this).
@@ -631,15 +660,25 @@
       const lb = r.leaderboard || [];
       const lbEl = document.getElementById('leader-rows');
       lbEl.innerHTML = '';
-      lb.slice(0, 5).forEach((p, i) => {
-        const row = document.createElement('div');
-        row.className = 'leader-row';
-        row.innerHTML =
-          `<span class="pos">${i + 1}</span>` +
-          `<span class="email">${escapeHtml(p.email)}</span>` +
-          `<span class="pts">${p.score.toLocaleString()}</span>`;
-        lbEl.appendChild(row);
-      });
+      // No-padding rule: render only as many rows as there are players. With 0
+      // players, show a small placeholder rather than an empty card.
+      const list = lb.slice(0, 5);
+      if (list.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No players yet.';
+        lbEl.appendChild(empty);
+      } else {
+        list.forEach((p, i) => {
+          const row = document.createElement('div');
+          row.className = 'leader-row';
+          row.innerHTML =
+            `<span class="pos">${i + 1}</span>` +
+            `<span class="name">${escapeHtml(displayName(p))}</span>` +
+            `<span class="pts">${(p.score || 0).toLocaleString()}</span>`;
+          lbEl.appendChild(row);
+        });
+      }
 
       showStage('reveal');
     });
@@ -650,33 +689,46 @@
 
       const podiumEl = document.getElementById('podium');
       podiumEl.innerHTML = '';
-      const medals = ['🥇', '🥈', '🥉'];
-      const classes = ['gold', 'silver', 'bronze'];
-      // Visual order: silver, gold, bronze (gold in the middle, taller).
-      const visualOrder = [1, 0, 2];
-      visualOrder.forEach((rank) => {
-        const p = podium[rank];
-        if (!p) return;
-        const div = document.createElement('div');
-        div.className = `pillar ${classes[rank]}`;
-        div.innerHTML =
-          `<div class="medal">${medals[rank]}</div>` +
-          `<div class="email">${escapeHtml(p.email)}</div>` +
-          `<div class="score">${p.score.toLocaleString()}</div>`;
-        podiumEl.appendChild(div);
-      });
-
       const alsoEl = document.getElementById('also-rans');
       alsoEl.innerHTML = '';
-      podium.slice(3).forEach((p, i) => {
-        const row = document.createElement('div');
-        row.className = 'row';
-        row.innerHTML =
-          `<span class="pos">#${i + 4}</span>` +
-          `<span class="email">${escapeHtml(p.email)}</span>` +
-          `<span class="pts">${p.score.toLocaleString()}</span>`;
-        alsoEl.appendChild(row);
-      });
+
+      if (podium.length === 0) {
+        // Defensive empty state — shouldn't normally happen, but if the
+        // game finishes with zero scoring players don't render an empty card.
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No players to show.';
+        podiumEl.appendChild(empty);
+      } else {
+        const medals = ['🥇', '🥈', '🥉'];
+        const classes = ['gold', 'silver', 'bronze'];
+        // Visual order: silver, gold, bronze (gold in the middle, taller).
+        // The if-skip on missing entries naturally handles fewer-than-3 cases:
+        // 1 player → only gold pillar; 2 players → gold + silver; etc.
+        const visualOrder = [1, 0, 2];
+        visualOrder.forEach((rank) => {
+          const p = podium[rank];
+          if (!p) return;
+          const div = document.createElement('div');
+          div.className = `pillar ${classes[rank]}`;
+          div.innerHTML =
+            `<div class="medal">${medals[rank]}</div>` +
+            `<div class="name">${escapeHtml(displayName(p))}</div>` +
+            `<div class="score">${(p.score || 0).toLocaleString()}</div>`;
+          podiumEl.appendChild(div);
+        });
+
+        // Ranks 4 and 5 (also-rans). slice(3) is empty when podium has ≤3.
+        podium.slice(3).forEach((p, i) => {
+          const row = document.createElement('div');
+          row.className = 'row';
+          row.innerHTML =
+            `<span class="pos">#${i + 4}</span>` +
+            `<span class="name">${escapeHtml(displayName(p))}</span>` +
+            `<span class="pts">${(p.score || 0).toLocaleString()}</span>`;
+          alsoEl.appendChild(row);
+        });
+      }
 
       document.getElementById('topmeta').textContent = 'Final';
       showStage('finished');
