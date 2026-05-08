@@ -19,6 +19,7 @@
       --green: #15B886;
       --red: #E5484D;
       --amber: #F59E0B;
+      --gold: #F4C430;
       --shadow: 0 1px 2px rgba(14,26,43,0.04), 0 8px 24px rgba(14,26,43,0.06);
     }
     * { box-sizing: border-box; }
@@ -106,6 +107,15 @@
     .btn-secondary:hover:not(:disabled) { border-color: var(--brand); }
     .btn-danger     { background: var(--amber); color: #fff; }
     .btn-danger:active:not(:disabled)   { transform: scale(0.98); }
+    /* Stage D: podium-reveal button gets gold treatment to feel celebratory.
+       Visually distinct from the standard primary brand button so the host
+       knows this is the special end-of-game ceremonial action. */
+    .btn-celebrate  {
+      background: linear-gradient(135deg, #F4C430 0%, #FF8C00 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(244, 196, 48, 0.3);
+    }
+    .btn-celebrate:active:not(:disabled) { transform: scale(0.98); }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .err { color: var(--red); font-size: 14px; min-height: 18px; }
@@ -172,9 +182,6 @@
       border-color: var(--green);
     }
     .q-display .opt.correct .letter { background: var(--green); }
-    /* During PREVIEW, the host sees the options dimmed — visual cue that
-       they haven't been revealed to players yet. The moderator clicks
-       Advance again to flip them to full opacity (and start the timer). */
     .q-display.preview .opts { opacity: 0.55; }
 
     .actions {
@@ -182,6 +189,7 @@
       padding-top: 20px;
       border-top: 1px solid var(--line);
       align-items: center;
+      flex-wrap: wrap;
     }
     .actions .btn { min-width: 160px; }
     .actions .spacer { flex: 1; }
@@ -193,13 +201,16 @@
       text-transform: uppercase; letter-spacing: 0.06em;
     }
     .badge.lobby    { background: rgba(0,100,255,0.10); color: var(--brand); }
-    /* Stage E: subtle amber tint for PREVIEW — distinguishable from lobby
-       (blue), more muted than active (full amber). Reads as "warming up". */
     .badge.preview  { background: rgba(245,158,11,0.08); color: #B45309; }
     .badge.active   { background: rgba(245,158,11,0.12); color: var(--amber); }
     .badge.closed   { background: rgba(229,72,77,0.10);  color: var(--red); }
     .badge.revealed { background: rgba(21,184,134,0.12); color: var(--green); }
     .badge.finished { background: rgba(0,0,0,0.06); color: var(--text); }
+    /* Stage D: when game is finished AND podium revealed — gold celebration tint. */
+    .badge.podiumRevealed {
+      background: linear-gradient(135deg, rgba(244,196,48,0.15) 0%, rgba(255,140,0,0.15) 100%);
+      color: #B45309;
+    }
     .badge .pulse {
       display: inline-block; width: 6px; height: 6px;
       border-radius: 50%; background: currentColor;
@@ -335,15 +346,17 @@
       </div>
 
       <div class="reveal-leaderboard hidden" id="reveal-leaderboard">
-        <h3>Top 5 right now</h3>
+        <h3 id="leaderboard-title">Top 5 right now</h3>
         <div id="leaderboard-body"></div>
       </div>
 
       <div class="actions">
-        <button class="btn btn-primary" id="btn-advance" disabled>Advance</button>
-        <button class="btn btn-danger"  id="btn-reveal" disabled>Reveal</button>
+        <button class="btn btn-primary"   id="btn-advance"        disabled>Advance</button>
+        <button class="btn btn-danger"    id="btn-reveal"         disabled>Reveal</button>
+        <!-- Stage D: only visible in FINISHED state when podium not yet revealed -->
+        <button class="btn btn-celebrate" id="btn-reveal-podium"  disabled hidden>🏆 Reveal Podium</button>
         <div class="spacer"></div>
-        <button class="btn btn-secondary" id="btn-reset" disabled>Reset</button>
+        <button class="btn btn-secondary" id="btn-reset"          disabled>Reset</button>
       </div>
     </section>
   </main>
@@ -373,19 +386,24 @@
     const qText      = document.getElementById('q-text');
     const qOpts      = document.getElementById('q-opts');
     const lbWrap     = document.getElementById('reveal-leaderboard');
+    const lbTitle    = document.getElementById('leaderboard-title');
     const lbBody     = document.getElementById('leaderboard-body');
     const btnAdvance = document.getElementById('btn-advance');
     const btnReveal  = document.getElementById('btn-reveal');
+    const btnRevealPodium = document.getElementById('btn-reveal-podium');
     const btnReset   = document.getElementById('btn-reset');
     const toast      = document.getElementById('toast');
 
     let socket = null;
     let hostToken = null;
-    let serverState = 'lobby';      // mirrors server's state machine
-    let lastQuestion = null;        // last state:question OR state:question_preview payload
+    let serverState = 'lobby';
+    let lastQuestion = null;
     let lastReveal   = null;
     let lastAnswerCount = { count: 0, total: 0 };
-    let lastPlayerCount = 0;        // remembered from state:lobby for display during PREVIEW
+    let lastPlayerCount = 0;
+    // Stage D: tracks game.podiumRevealed flag from state:finished payload +
+    // state:podiumRevealed event. Drives the Reveal Podium button visibility.
+    let podiumRevealed = false;
     let timerInterval = null;
     let toastTimer = null;
 
@@ -451,6 +469,7 @@
         lastQuestion = null;
         lastReveal = null;
         lastPlayerCount = p.playerCount || 0;
+        podiumRevealed = false;
         statQ.textContent = '—';
         statMidLab.textContent = 'Players Joined';
         statMid.textContent = lastPlayerCount.toLocaleString();
@@ -463,9 +482,6 @@
         updateButtonState();
       });
 
-      // Stage E: question_preview phase. Host sees the question text + options
-      // (dimmed via .preview class on q-display), but no timer is running and
-      // no answers are accepted. The next host:advance starts the timer.
       socket.on('state:question_preview', (q) => {
         serverState = 'preview';
         lastQuestion = q;
@@ -530,6 +546,7 @@
         renderQuestion(lastQuestion || { text: r.questionText, options: r.options }, r.correctOption);
         qDisplay.classList.remove('preview');
         qDisplay.classList.remove('hidden');
+        lbTitle.textContent = 'Top 5 right now';
         renderLeaderboard(r.leaderboard || []);
         lbWrap.classList.remove('hidden');
         statMidLab.textContent = '% Correct';
@@ -540,17 +557,36 @@
         updateButtonState();
       });
 
+      // Stage D: state:finished now carries top10 (was podium, with 5 entries)
+      // and the podiumRevealed flag. Host displays top 5 in the console as
+      // before — the moderator doesn't need the full top-10 list (that's for
+      // /board to render with celebration animation).
       socket.on('state:finished', (f) => {
         serverState = 'finished';
+        podiumRevealed = !!(f && f.podiumRevealed);
         statQ.textContent = '—';
         statMidLab.textContent = 'Game';
         statMid.textContent = 'Done';
         statTime.textContent = '—';
         qDisplay.classList.add('hidden');
         qDisplay.classList.remove('preview');
-        renderLeaderboard(f.podium || []);
+        lbTitle.textContent = 'Final Top 5';
+        renderLeaderboard((f && f.top10) || []);
         lbWrap.classList.remove('hidden');
-        setBadge('finished', 'Finished');
+        setBadge(podiumRevealed ? 'podiumRevealed' : 'finished',
+                 podiumRevealed ? 'Podium Revealed' : 'Finished');
+        updateButtonState();
+      });
+
+      // Stage D: live transition from blurred-list to revealed-pillars on
+      // /board. Host UI just needs to flip the local flag and update buttons —
+      // no visual celebration on the moderator console.
+      socket.on('state:podiumRevealed', () => {
+        podiumRevealed = true;
+        if (serverState === 'finished') {
+          setBadge('podiumRevealed', 'Podium Revealed');
+        }
+        showToast('🏆 Podium revealed on screen');
         updateButtonState();
       });
 
@@ -558,6 +594,7 @@
         lastAnswerCount = { count: 0, total: 0 };
         lastQuestion = null;
         lastReveal = null;
+        podiumRevealed = false;
         showToast('Game reset — back to lobby');
       });
     }
@@ -632,6 +669,16 @@
       });
     });
 
+    // Stage D: trigger the on-screen podium celebration. No confirm dialog —
+    // it's irreversible-but-not-destructive, and the moderator wants instant
+    // feedback when they hit this for the dramatic moment.
+    btnRevealPodium.addEventListener('click', () => {
+      if (btnRevealPodium.disabled) return;
+      socket.emit('host:revealPodium', {}, (ack) => {
+        if (!ack || !ack.ok) console.warn('revealPodium rejected:', ack && ack.error);
+      });
+    });
+
     btnReset.addEventListener('click', () => {
       if (btnReset.disabled) return;
       const msg = (serverState === 'finished')
@@ -646,7 +693,6 @@
     function updateButtonState() {
       const connected = socket && socket.connected;
 
-      // ADVANCE: valid from lobby (start), preview (reveal options), or revealed (next).
       btnAdvance.disabled = !connected || (
         serverState !== 'lobby' &&
         serverState !== 'preview' &&
@@ -659,9 +705,20 @@
         serverState === 'revealed' ? 'Next Question' :
         serverState === 'finished' ? 'Finished' : 'Advance';
 
-      // REVEAL: valid from active (early) or closed. PREVIEW does NOT allow reveal.
       btnReveal.disabled  = !connected || (serverState !== 'active' && serverState !== 'closed');
       btnReveal.textContent = serverState === 'active' ? 'Reveal Early' : 'Reveal';
+
+      // Stage D: Reveal Podium button visibility. Only relevant in FINISHED
+      // state, only enabled before the first reveal click. After reveal we
+      // hide it entirely so the host UI doesn't have a dead button cluttering
+      // the action bar.
+      if (serverState === 'finished' && !podiumRevealed) {
+        btnRevealPodium.hidden = false;
+        btnRevealPodium.disabled = !connected;
+      } else {
+        btnRevealPodium.hidden = true;
+        btnRevealPodium.disabled = true;
+      }
 
       btnReset.disabled = !connected;
       if (serverState === 'finished') {
