@@ -12,12 +12,25 @@
  *                                                                          |
  *   revealed --advance--> active(next)  OR  finished
  *
- *   ANY state --host:reset--> lobby (clears all players, scores, timers)
+ *   ANY state --host:reset--> lobby (clears all players, scores, timers,
+ *                                    and rotates the room code)
  *
- * Ten Socket.IO events:
+ * Thirteen Socket.IO events:
  *   Client → Server: player:join, player:answer, host:advance, host:reveal, host:reset
  *   Server → Client: state:lobby, state:question, state:answerCount,
- *                    state:reveal, state:finished, state:reset, error
+ *                    state:reveal, state:finished, state:reset, state:meta, error
+ *
+ * Room code:
+ *   - 4-digit numeric code generated once at boot (or restored from JSONL replay)
+ *   - Required on player:join; mismatch → INVALID_CODE
+ *   - Rotated on host:reset so leaked codes don't carry over to next game
+ *   - Broadcast via state:meta on connect and after reset
+ *
+ * Late-join rules:
+ *   - NEW players joining when state != LOBBY → rejected with GAME_STARTED
+ *   - EXISTING players (already in game.players from lobby) → allowed to rejoin
+ *     from any state. They get snapped to the current state. Handles network
+ *     drops, page refreshes, browser restarts mid-game.
  */
 
 const http = require('http');
@@ -94,6 +107,7 @@ const STATE = Object.freeze({
 // All mutable game state lives in this single object — easy to reason about.
 const game = {
   state: STATE.LOBBY,
+  roomCode: null,             // 4-digit string. null until ensureRoomCode() runs (boot).
   currentIndex: -1,           // index of the current question (-1 = no question yet)
   currentStartedAt: null,     // server timestamp (ms) when current question started
   currentEndsAt: null,        // server timestamp (ms) when current question's timer expires
@@ -101,6 +115,18 @@ const game = {
   currentAnswers: new Map(),  // email -> answer record, JUST for the current question
   closeTimer: null,           // setTimeout handle for auto-close on timer expiry
 };
+
+// =====================================================================
+// ROOM CODE
+//
+// 4-digit numeric code (1000-9999). Persisted via the room_code_set event so
+// it survives crash + replay. Rotated on host:reset.
+// =====================================================================
+
+function generateRoomCode() {
+  // Range 1000-9999 — avoids leading-zero ambiguity when displayed.
+  return String(1000 + Math.floor(Math.random() * 9000));
+}
 
 // =====================================================================
 // SCORING (deterministic — same inputs always yield same output)
@@ -117,8 +143,6 @@ function calculateScore(correct, elapsedMs, durationMs) {
 // =====================================================================
 // LEADERBOARD
 //   Sort by score DESC, then by email ASC for deterministic tie-breaking.
-//   Two correct answers 50ms apart yield identical scores most of the time;
-//   the email comparator guarantees a stable ranking across replays.
 // =====================================================================
 
 function getLeaderboard(topN) {
@@ -140,13 +164,6 @@ function getRankFor(email) {
 
 // =====================================================================
 // EVENT APPLICATION
-//
-// applyEvent() mutates state. It runs both at runtime (after we accept a
-// new event) AND during boot replay (when reading events back from disk).
-// It must therefore be:
-//   - deterministic given the event payload
-//   - idempotent where it matters (e.g. duplicate "answer" events are no-ops)
-//   - free of side effects (no I/O, no broadcasts) — those happen separately
 // =====================================================================
 
 function applyEvent(event) {
@@ -192,9 +209,6 @@ function applyEvent(event) {
       player.answers.set(event.qIndex, record);
       player.score += scoreAwarded;
 
-      // currentAnswers tracks ONLY the active question (cleared on each
-      // question_started). During replay this works because events arrive in
-      // order; the question_started for index N is applied before answers for N.
       if (event.qIndex === game.currentIndex) {
         game.currentAnswers.set(event.email, record);
       }
@@ -218,15 +232,19 @@ function applyEvent(event) {
 
     case 'reset': {
       // Wipe ALL logical game state back to a freshly-booted lobby.
-      // Note: closeTimer is a runtime-only handle, NOT logical state — it must
-      // be cleared by the runtime caller (hostReset) before recordAndPersist,
-      // not here, so applyEvent stays free of side effects (rule for replay).
+      // roomCode is rotated separately by hostReset() via a fresh
+      // room_code_set event, so applyEvent's reset case stays narrow.
       game.state = STATE.LOBBY;
       game.currentIndex = -1;
       game.currentStartedAt = null;
       game.currentEndsAt = null;
       game.players = new Map();
       game.currentAnswers = new Map();
+      break;
+    }
+
+    case 'room_code_set': {
+      game.roomCode = event.code;
       break;
     }
 
@@ -237,9 +255,6 @@ function applyEvent(event) {
 
 // =====================================================================
 // RECORD-AND-PERSIST helper
-//
-// Wrap up the "right way" to make a state change: build the event, apply it,
-// then append it to disk. Anyone calling this can be sure nothing diverges.
 // =====================================================================
 
 function recordAndPersist(event) {
@@ -260,8 +275,7 @@ function buildQuestionPayload() {
     options: q.options,
     startsAt: game.currentStartedAt,
     endsAt: game.currentEndsAt,
-    serverNow: Date.now(),     // lets clients estimate clock skew for the local timer
-    // NOTE: correctOption is NOT included here — clients learn it on reveal.
+    serverNow: Date.now(),
   };
 }
 
@@ -294,9 +308,6 @@ function buildRevealPayload() {
 }
 
 function buildPlayerRevealPayload(email, publicCache, rankByEmail) {
-  // If caller passed pre-computed values (broadcast hot path), use them.
-  // Otherwise compute fresh — single-socket paths (e.g. sendCurrentStateTo on
-  // a late reconnect) take this branch and pay the cost just for themselves.
   const base = publicCache || buildRevealPayload();
   const rank = rankByEmail ? (rankByEmail.get(email) || null) : getRankFor(email);
 
@@ -338,10 +349,8 @@ function broadcastState() {
       break;
 
     case STATE.REVEALED: {
-      // /board and /host get the public reveal; each /play client gets a personalized one.
       const publicReveal = buildRevealPayload();
-      // Precompute the rank lookup once. Without this, each per-player payload
-      // re-sorted all N players (O(N²) — at 2500 players, ~4 seconds of CPU).
+      // Precompute the rank lookup once (the O(N²) fix from the load test).
       const sortedAll = getLeaderboard();
       const rankByEmail = new Map();
       for (let i = 0; i < sortedAll.length; i++) {
@@ -364,8 +373,13 @@ function broadcastState() {
 }
 
 function sendCurrentStateTo(socket) {
-  // Used when a client just connected (or just joined as a player) — they need
-  // to know whatever state the game is in right now.
+  // Always send the room code first, before any state event. Clients (esp.
+  // /board) need it to render the lobby header regardless of game phase.
+  socket.emit('state:meta', { code: game.roomCode });
+
+  // Then snap this socket to whatever state the game is in right now. This
+  // is also the path used when an existing player rejoins mid-game — they
+  // immediately see whatever question/reveal/finished screen is current.
   switch (game.state) {
     case STATE.LOBBY:
       socket.emit('state:lobby', { playerCount: game.players.size });
@@ -393,16 +407,13 @@ function sendCurrentStateTo(socket) {
 }
 
 // =====================================================================
-// THROTTLED ANSWER COUNT BROADCASTS (max 4/sec — spec)
-//
-// While a question is active, every accepted answer schedules a broadcast.
-// If a broadcast is already pending, we coalesce — that's the throttle.
+// THROTTLED ANSWER COUNT BROADCASTS (max 4/sec)
 // =====================================================================
 
 let answerCountTimer = null;
 
 function scheduleAnswerCountBroadcast() {
-  if (answerCountTimer) return;     // already pending; will fire soon
+  if (answerCountTimer) return;
   answerCountTimer = setTimeout(() => {
     answerCountTimer = null;
     if (game.state === STATE.ACTIVE || game.state === STATE.CLOSED) {
@@ -417,10 +428,6 @@ function scheduleAnswerCountBroadcast() {
 
 // =====================================================================
 // THROTTLED LOBBY COUNT BROADCASTS
-//
-// Same pattern. A naive io.emit on every join is O(N²) during ramp — at 2500
-// joins, that's ~3M total socket writes (1+2+...+2500). The throttle caps it
-// at 4 broadcasts/sec regardless of join rate.
 // =====================================================================
 
 let lobbyBroadcastTimer = null;
@@ -446,8 +453,6 @@ function scheduleAutoClose() {
   }
   const remainingMs = game.currentEndsAt - Date.now();
   if (remainingMs <= 0) {
-    // After replay, the question's timer may already have expired during downtime.
-    // Close immediately so we resume in the right state.
     closeCurrentQuestion();
   } else {
     game.closeTimer = setTimeout(closeCurrentQuestion, remainingMs);
@@ -455,20 +460,18 @@ function scheduleAutoClose() {
 }
 
 function closeCurrentQuestion() {
-  if (game.state !== STATE.ACTIVE) return;     // already closed by host or by an earlier path
+  if (game.state !== STATE.ACTIVE) return;
   recordAndPersist({
     type: 'question_closed',
     ts: Date.now(),
     index: game.currentIndex,
   });
-  // Final answer-count flush so /host and /board see the true total before reveal.
   io.emit('state:answerCount', {
     count: game.currentAnswers.size,
     total: game.players.size,
     index: game.currentIndex,
     final: true,
   });
-  // We do NOT auto-reveal — the moderator decides when via host:reveal.
 }
 
 // =====================================================================
@@ -476,7 +479,6 @@ function closeCurrentQuestion() {
 // =====================================================================
 
 function hostAdvance() {
-  // Valid from LOBBY (start the first question) or REVEALED (next question, or finish).
   if (game.state !== STATE.LOBBY && game.state !== STATE.REVEALED) {
     throw new Error(`Cannot advance from state "${game.state}"`);
   }
@@ -492,7 +494,6 @@ function hostAdvance() {
 }
 
 function hostReveal() {
-  // Valid from ACTIVE (early reveal) or CLOSED (normal flow).
   if (game.state === STATE.ACTIVE) {
     if (game.closeTimer) {
       clearTimeout(game.closeTimer);
@@ -516,11 +517,6 @@ function hostReveal() {
 }
 
 function hostReset() {
-  // Allowed from ANY state. The host page guards against accidental clicks
-  // with a confirmation dialog; server trusts the moderator beyond that.
-
-  // 1. Cancel any pending runtime side effects so they don't fire against the
-  //    fresh-lobby state we're about to install.
   if (game.closeTimer) {
     clearTimeout(game.closeTimer);
     game.closeTimer = null;
@@ -534,23 +530,22 @@ function hostReset() {
     lobbyBroadcastTimer = null;
   }
 
-  // 2. Persist + apply the reset event. After this returns, game.players is
-  //    empty, currentIndex is -1, and game.state is LOBBY.
   recordAndPersist({ type: 'reset', ts: Date.now() });
 
-  // 3. Clear cached identity from every connected player socket. Without this,
-  //    a player who misses the state:reset event on the wire could still pass
-  //    the `socket.data.email` guard in player:answer and produce an "Unknown
-  //    player" error the client can't recover from cleanly.
+  // Rotate the room code so leaked codes don't carry over.
+  const newCode = generateRoomCode();
+  recordAndPersist({ type: 'room_code_set', ts: Date.now(), code: newCode });
+  console.log('host:reset: new room code is', newCode);
+
+  // Clear cached identity from every connected player socket.
   for (const [, sock] of io.of('/').sockets) {
     if (sock.data.role === 'player') {
       sock.data.email = null;
     }
   }
 
-  // 4. Tell every connected client to wipe local UI state. The follow-up
-  //    state:lobby broadcast (from broadcastState) gives them the new state.
   io.emit('state:reset', {});
+  io.emit('state:meta', { code: game.roomCode });
   broadcastState();
 }
 
@@ -567,6 +562,7 @@ app.get('/board', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'board.html'
 app.get('/health', (_req, res) => res.json({
   status: 'ok',
   state: game.state,
+  roomCode: game.roomCode,
   currentIndex: game.currentIndex,
   playerCount: game.players.size,
   uptimeSec: Math.round(process.uptime()),
@@ -574,12 +570,9 @@ app.get('/health', (_req, res) => res.json({
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-  // WebSocket only — long-polling fallback doubles HTTP overhead at scale.
   transports: ['websocket'],
-  // Slightly relaxed pings — cuts overhead at 2000 connections.
   pingInterval: 25000,
   pingTimeout: 20000,
-  // Allow larger handshake payloads if needed.
   maxHttpBufferSize: 1e6,
 });
 
@@ -587,8 +580,6 @@ const io = new Server(httpServer, {
 // EMAIL VALIDATION
 // =====================================================================
 
-// Build the regex once. Escape dots in the domain so "wbd.com" isn't read
-// as "wbd<any-char>com" by the regex engine.
 const escapedDomain = ALLOWED_EMAIL_DOMAIN.replace(/\./g, '\\.');
 const EMAIL_REGEX = new RegExp(`^[A-Za-z0-9._%+-]+@${escapedDomain}$`, 'i');
 
@@ -597,10 +588,6 @@ const EMAIL_REGEX = new RegExp(`^[A-Za-z0-9._%+-]+@${escapedDomain}$`, 'i');
 // =====================================================================
 
 io.on('connection', (socket) => {
-  // The client sends auth info during the handshake. Three roles:
-  //   - 'host'   : moderator; must present HOST_TOKEN
-  //   - 'board'  : projector display; no auth (read-only, no PII)
-  //   - 'player' : default; identifies later via player:join + email
   const auth = socket.handshake.auth || {};
 
   if (auth.role === 'host') {
@@ -618,7 +605,9 @@ io.on('connection', (socket) => {
     sendCurrentStateTo(socket);
   } else {
     socket.data.role = 'player';
-    // Player must call player:join before they're considered "in".
+    // Send the room code immediately so the player UI can pre-validate input
+    // before they bother filling out email + code.
+    socket.emit('state:meta', { code: game.roomCode });
   }
 
   // ----- Player events -----
@@ -627,20 +616,39 @@ io.on('connection', (socket) => {
     if (socket.data.role !== 'player') {
       return safeAck(ack, { ok: false, error: 'Not a player socket' });
     }
+
+    // 1. Code must match the active room code.
+    const submittedCode = String((payload && payload.code) || '').trim();
+    if (!submittedCode || submittedCode !== game.roomCode) {
+      return safeAck(ack, { ok: false, error: 'INVALID_CODE' });
+    }
+
+    // 2. Email must match the allowed domain.
     const email = String((payload && payload.email) || '').trim().toLowerCase();
     if (!EMAIL_REGEX.test(email)) {
       return safeAck(ack, { ok: false, error: `Email must end in @${ALLOWED_EMAIL_DOMAIN}` });
     }
+
+    // 3. Late-join rule: if the game is past LOBBY, only EXISTING players
+    //    (those who joined during lobby) are allowed back in. This handles
+    //    network drops / refreshes / browser restarts mid-game. Genuinely
+    //    new players who didn't join during lobby are bounced.
+    if (game.state !== STATE.LOBBY && !game.players.has(email)) {
+      return safeAck(ack, { ok: false, error: 'GAME_STARTED' });
+    }
+
     socket.data.email = email;
     // Persist the join (idempotent — duplicate joins for same email are no-ops in applyEvent).
     recordAndPersist({ type: 'join', ts: Date.now(), email });
 
     safeAck(ack, { ok: true });
 
-    // Snap this socket to the current game state.
+    // Snap this socket to the current game state — works for both lobby
+    // joins and mid-game rejoins. sendCurrentStateTo emits the right event
+    // for whatever phase we're in.
     sendCurrentStateTo(socket);
+
     // Refresh the lobby count for everyone (only meaningful in LOBBY state).
-    // Throttled so a 2000-player ramp doesn't trigger O(N²) broadcast traffic.
     if (game.state === STATE.LOBBY) {
       scheduleLobbyBroadcast();
     }
@@ -667,7 +675,6 @@ io.on('connection', (socket) => {
       return safeAck(ack, { ok: false, error: 'Already answered' });
     }
 
-    // Server timestamp — we never trust client time.
     recordAndPersist({
       type: 'answer',
       ts: Date.now(),
@@ -711,7 +718,7 @@ io.on('connection', (socket) => {
     }
     try {
       hostReset();
-      console.log('host:reset performed; game wiped to lobby');
+      console.log('host:reset performed; game wiped to lobby, code rotated to', game.roomCode);
       safeAck(ack, { ok: true });
     } catch (e) {
       safeAck(ack, { ok: false, error: e.message });
@@ -719,13 +726,12 @@ io.on('connection', (socket) => {
   });
 });
 
-// Tiny helper so we don't crash if a buggy client omits the ack callback.
 function safeAck(ack, payload) {
   if (typeof ack === 'function') ack(payload);
 }
 
 // =====================================================================
-// CRASH RECOVERY: replay events from JSONL on boot
+// CRASH RECOVERY
 // =====================================================================
 
 function replayFromDisk() {
@@ -738,13 +744,19 @@ function replayFromDisk() {
   });
   const elapsedMs = Date.now() - startMs;
   console.log(`Replayed ${count} events in ${elapsedMs}ms. ` +
-    `state=${game.state}, players=${game.players.size}, currentIndex=${game.currentIndex}`);
+    `state=${game.state}, players=${game.players.size}, currentIndex=${game.currentIndex}, ` +
+    `roomCode=${game.roomCode || '(none yet)'}`);
 
-  // If we landed in ACTIVE state, the timer may already have expired during
-  // downtime — scheduleAutoClose handles both "expired" and "still ticking" cases.
   if (game.state === STATE.ACTIVE) {
     scheduleAutoClose();
   }
+}
+
+function ensureRoomCode() {
+  if (game.roomCode) return;
+  const code = generateRoomCode();
+  recordAndPersist({ type: 'room_code_set', ts: Date.now(), code });
+  console.log('Generated initial room code:', code);
 }
 
 // =====================================================================
@@ -753,16 +765,16 @@ function replayFromDisk() {
 
 persistence.init(STATE_FILE);
 replayFromDisk();
+ensureRoomCode();
 
 httpServer.listen(PORT, () => {
   console.log(`Quiz server listening on :${PORT}`);
   console.log(`State file: ${STATE_FILE}`);
   console.log(`Allowed email domain: @${ALLOWED_EMAIL_DOMAIN}`);
   console.log(`Host token (first 4 chars): ${HOST_TOKEN.slice(0, 4)}...`);
+  console.log(`Active room code: ${game.roomCode}`);
 });
 
-// Graceful shutdown — flush the write stream before exit so we don't lose the
-// last few buffered events when systemd sends SIGTERM during a deploy.
 function shutdown(signal) {
   console.log(`Received ${signal}, shutting down...`);
   persistence.close(() => {
