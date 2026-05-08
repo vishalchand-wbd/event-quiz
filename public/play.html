@@ -62,7 +62,7 @@
     }
     .center { display: flex; flex-direction: column; justify-content: center; flex: 1; }
 
-    /* Identity gate (now collects first name + last name + email) */
+    /* Identity gate */
     .email-form { display: flex; flex-direction: column; gap: 16px; }
     .email-form label {
       font-size: 13px; font-weight: 600; color: var(--muted);
@@ -147,6 +147,28 @@
       50%      { opacity: 1;   transform: scale(1.1); }
     }
 
+    /* Preview — player sees only the question NUMBER, not the text. They
+       look at the projector for the actual question content. This builds
+       tension for the moderator's "Reveal Options" click and (deliberately)
+       prevents glance-cheating where someone races to read the question
+       text on their phone before the host is ready. */
+    .preview-state { text-align: center; padding: 16px 0; }
+    .preview-state .preview-label {
+      font-size: 13px; font-weight: 700; color: var(--brand);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+    .preview-state .preview-q-num {
+      font-size: 44px; font-weight: 800; margin: 0 0 16px; line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .preview-state .preview-q-num .of {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.65em;
+    }
+    .preview-state .preview-hint { color: var(--muted); margin: 0; font-size: 15px; }
+
     /* Question */
     .qheader {
       display: flex; justify-content: space-between; align-items: center;
@@ -211,9 +233,7 @@
     .locked h2 { margin: 0 0 8px; font-size: 22px; text-align: center; }
     .locked p  { margin: 0 0 16px; text-align: center; color: var(--muted); }
 
-    /* Reveal — redesigned: question + verdict + points + 4 options with marks.
-       NO total score, NO rank. The player learns only what they got right or
-       wrong this round. */
+    /* Reveal */
     .reveal-q-meta {
       font-size: 12px; font-weight: 700; color: var(--muted);
       text-transform: uppercase; letter-spacing: 0.08em;
@@ -239,9 +259,6 @@
     }
     .reveal .points.zero { color: var(--muted); }
 
-    /* Per-option result row in reveal view. Mirrors .option visually but
-       non-interactive, with a tick/cross badge for the correct option and
-       the player's wrong pick. Other options stay neutral. */
     .option-result {
       width: 100%; padding: 14px 16px;
       font-size: 16px; font-weight: 600;
@@ -275,14 +292,13 @@
     .option-result.wrong-pick .letter { background: var(--red); color: #fff; }
     .option-result.wrong-pick .mark   { background: var(--red); }
 
-    /* Finished — minimal "Thanks for playing" card. No score, no rank,
-       no leaderboard. The board owns the post-game drama. */
+    /* Finished */
     .thanks { text-align: center; }
     .thanks-icon { font-size: 64px; line-height: 1; margin-bottom: 16px; }
     .thanks h2 { font-size: 28px; font-weight: 800; margin: 0 0 12px; }
     .thanks p  { color: var(--muted); margin: 0; }
 
-    /* Reset banner */
+    /* Banners */
     .reset-banner {
       padding: 12px 16px; margin-bottom: 16px;
       background: rgba(0,100,255,0.08);
@@ -292,8 +308,6 @@
       font-size: 14px; font-weight: 600;
       text-align: center;
     }
-
-    /* Late-join banner */
     .late-join-banner {
       padding: 12px 16px; margin-bottom: 16px;
       background: rgba(229,72,77,0.08);
@@ -315,7 +329,7 @@
   </header>
 
   <main>
-    <!-- 1. Identity gate (first name + last name + email) -->
+    <!-- 1. Identity gate -->
     <section id="view-email" class="card center">
       <div id="reset-banner" class="reset-banner hidden">The game was reset by the moderator. Please rejoin.</div>
       <div id="late-join-banner" class="late-join-banner hidden">Sorry, the game has already started. You can't join right now.</div>
@@ -362,7 +376,17 @@
       </div>
     </section>
 
-    <!-- 4. Question -->
+    <!-- 4. Preview — host has shown the question on the projector but
+         hasn't revealed options/timer yet. Player sees the number only. -->
+    <section id="view-preview" class="card center hidden">
+      <div class="preview-state">
+        <div class="preview-label">Get ready</div>
+        <div class="preview-q-num"><span id="p-q-num-current">Question 1</span> <span class="of" id="p-q-num-of">of 10</span></div>
+        <p class="preview-hint">Look at the screen at the front of the room.</p>
+      </div>
+    </section>
+
+    <!-- 5. Question (active) -->
     <section id="view-question" class="card hidden">
       <div class="qheader">
         <span id="q-counter">Question 1 of 10</span>
@@ -373,7 +397,7 @@
       <div class="answer-counter hidden" id="q-answer-counter">0 of 0 answered</div>
     </section>
 
-    <!-- 5. Locked / Time's up -->
+    <!-- 6. Locked / Time's up -->
     <section id="view-locked" class="card center hidden">
       <div class="locked">
         <div class="icon" id="locked-icon">✓</div>
@@ -383,7 +407,7 @@
       </div>
     </section>
 
-    <!-- 6. Reveal -->
+    <!-- 7. Reveal -->
     <section id="view-reveal" class="card hidden">
       <div class="reveal">
         <div class="reveal-q-meta" id="r-q-meta">Question 1 of 10</div>
@@ -394,7 +418,7 @@
       </div>
     </section>
 
-    <!-- 7. Finished — minimal Thanks card -->
+    <!-- 8. Finished -->
     <section id="view-finished" class="card center hidden">
       <div class="thanks">
         <div class="thanks-icon">🎉</div>
@@ -413,6 +437,7 @@
       email:    document.getElementById('view-email'),
       code:     document.getElementById('view-code'),
       lobby:    document.getElementById('view-lobby'),
+      preview:  document.getElementById('view-preview'),
       question: document.getElementById('view-question'),
       locked:   document.getElementById('view-locked'),
       reveal:   document.getElementById('view-reveal'),
@@ -423,10 +448,6 @@
     }
 
     // ===== State =====
-    // myEmail / myFirstName / myLastName / myCode are set ONLY after a
-    // successful server-acknowledged join and persisted to sessionStorage.
-    // pending* hold values being processed across the two form views BEFORE
-    // the server has accepted them — they're not persisted.
     let myEmail = null;
     let myFirstName = null;
     let myLastName = null;
@@ -436,9 +457,6 @@
     let pendingLastName = null;
     let pendingCode = null;
 
-    // currentAnswered tracks whether we submitted an answer for the current
-    // question. Used to decide between "Answer locked in" and "Time's up"
-    // copy on view-locked.
     let currentQIndex = -1;
     let currentAnswered = false;
     let timerInterval = null;
@@ -450,15 +468,11 @@
     const lateJoinBanner = document.getElementById('late-join-banner');
 
     // ===== Client-side name validation =====
-    // Mirrors the server's NAME_REGEX so the user gets fast feedback. Server
-    // is still authoritative — never trust client validation alone.
     const NAME_REGEX = /^[\p{L}\p{M}\s\-'\u2019.]+$/u;
     function isValidName(s) {
       return typeof s === 'string' && s.length >= 1 && s.length <= 40 && NAME_REGEX.test(s);
     }
 
-    // Map server error codes to user-facing copy. Centralized so future edits
-    // only need to touch one place.
     function errorMessage(code) {
       switch (code) {
         case 'EMAIL_DOMAIN':
@@ -498,9 +512,6 @@
         const code      = sessionStorage.getItem(SS_CODE);
         const firstName = sessionStorage.getItem(SS_FIRST_NAME);
         const lastName  = sessionStorage.getItem(SS_LAST_NAME) || '';
-        // firstName is required as of A2; an R3-era cache (no firstName) is
-        // treated as no cache so we don't auto-rejoin with stale credentials
-        // that the new server would reject as FIRST_NAME_REQUIRED.
         if (email && code && firstName) return { email, code, firstName, lastName };
       } catch (e) {}
       return null;
@@ -538,9 +549,6 @@
 
     socket.on('connect', () => {
       conn.classList.remove('offline'); conn.classList.add('online');
-
-      // Auto-rejoin from cached session. The server's "existing players can
-      // rejoin from any state" rule handles refreshes and mid-game reconnects.
       if (myEmail && myCode && myFirstName) {
         socket.emit('player:join', {
           email: myEmail,
@@ -558,15 +566,10 @@
             if (err === 'GAME_STARTED') {
               showLateJoinBanner();
             } else {
-              // INVALID_CODE most likely (host reset rotated the code), or
-              // some name validation failure. Either way the user has to
-              // re-enter from scratch.
               showResetBanner();
             }
             showView('email');
           }
-          // On success, server follows up with state:meta + state:lobby (or
-          // current state). Those handlers do the view transition.
         });
       }
     });
@@ -577,7 +580,7 @@
 
     socket.on('state:meta', (_meta) => { /* no-op; hook for future use */ });
 
-    // ===== Identity gate (first/last name + email) =====
+    // ===== Identity gate =====
     const joinForm = document.getElementById('join-form');
     const firstNameInput = document.getElementById('first-name');
     const lastNameInput = document.getElementById('last-name');
@@ -595,7 +598,6 @@
       const lastName = lastNameInput.value.trim();
       const email = emailInput.value.trim().toLowerCase();
 
-      // Client-side validation — fast feedback before the server round trip.
       if (!firstName) {
         emailErr.textContent = errorMessage('FIRST_NAME_REQUIRED');
         firstNameInput.focus();
@@ -621,8 +623,6 @@
       pendingLastName = lastName;
       pendingEmail = email;
 
-      // If we already have a code (from ?code= URL or a previous attempt),
-      // submit directly. Otherwise route to the code gate.
       if (pendingCode) {
         submitJoin(pendingEmail, pendingCode, pendingFirstName, pendingLastName);
       } else {
@@ -650,7 +650,6 @@
         return;
       }
       if (!pendingEmail || !pendingFirstName) {
-        // Defensive: if we got here without identity, bounce back to fix that.
         showView('email');
         return;
       }
@@ -659,13 +658,11 @@
     });
 
     codeBackBtn.addEventListener('click', () => {
-      // Preserve pendingCode + pendingNames so editing the email doesn't lose them.
       codeErr.textContent = '';
       showView('email');
       setTimeout(() => firstNameInput.focus(), 50);
     });
 
-    // ===== Join submission =====
     function submitJoin(email, code, firstName, lastName) {
       joinBtn.disabled = true;
       joinBtn.textContent = 'Joining…';
@@ -697,22 +694,18 @@
             showView('email');
             return;
           }
-          // Email or name validation rejected by server → show on identity form.
           emailErr.textContent = errorMessage(err);
           showView('email');
           return;
         }
 
-        // Success.
         myEmail = email;
         myFirstName = firstName;
         myLastName = lastName || '';
         myCode = code;
         saveSession(email, code, firstName, lastName || '');
-        // Personalize the lobby greeting now that we have a name to use.
         document.getElementById('lobby-greeting').textContent =
           `You're in, ${escapeHtml(firstName.split(/\s+/)[0])}.`;
-        // Server follows up with state:meta + state:lobby (or current state).
       });
     }
 
@@ -721,12 +714,31 @@
     socket.on('state:lobby', () => {
       if (!myEmail) return;
       hideAnswerCounter();
-      // If we're rejoining mid-session and have a name, personalize the greeting.
+      stopTimer();
       if (myFirstName) {
         document.getElementById('lobby-greeting').textContent =
           `You're in, ${escapeHtml(myFirstName.split(/\s+/)[0])}.`;
       }
       showView('lobby');
+    });
+
+    // Stage E: question_preview phase. Player sees only the question NUMBER.
+    // Server's payload to /play is intentionally limited to {index, total} —
+    // even devtools can't reveal the question text because the server didn't
+    // send it. By design, the player looks at the projector.
+    socket.on('state:question_preview', (q) => {
+      if (!myEmail) return;
+      currentQIndex = q.index;
+      currentAnswered = false;
+      stopTimer();
+      hideAnswerCounter();
+
+      const num = (q.index || 0) + 1;
+      const total = q.total || 0;
+      document.getElementById('p-q-num-current').textContent = `Question ${num}`;
+      document.getElementById('p-q-num-of').textContent = total ? `of ${total}` : '';
+
+      showView('preview');
     });
 
     socket.on('state:question', (q) => {
@@ -751,7 +763,6 @@
 
       showAnswerCounter();
 
-      // Local timer with clock-skew correction.
       const skewMs = Date.now() - q.serverNow;
       startTimer(q.endsAt + skewMs);
 
@@ -764,10 +775,6 @@
       document.getElementById('q-answer-counter').textContent = text;
       document.getElementById('locked-answer-counter').textContent = text;
 
-      // Server marks final flush after timer expiry. If we never answered AND
-      // we're still on view-question, switch to view-locked with "Time's up"
-      // copy. (If we already answered, we're already on view-locked with the
-      // standard "Answer locked in" content.)
       if (a.final && !currentAnswered && !views.question.classList.contains('hidden')) {
         showTimeUp();
       }
@@ -783,8 +790,6 @@
           all.forEach((b) => { b.disabled = false; });
           btnEl.classList.remove('selected');
           console.warn('answer rejected:', ack && ack.error);
-          // Self-heal if the server lost our session (host reset between
-          // question display and answer submission).
           if (ack && (ack.error === 'Not joined' || ack.error === 'Unknown player')) {
             myEmail = null; myCode = null;
             myFirstName = null; myLastName = null;
@@ -813,17 +818,14 @@
     function renderReveal(r) {
       const yr = r.yourResult || {};
 
-      // Question header (small) — restates context for the reveal screen.
       document.getElementById('r-q-meta').textContent =
         `Question ${(r.index != null ? r.index : 0) + 1}`;
       document.getElementById('r-q-text').textContent = r.questionText || '';
 
-      // Verdict + points
       const verdictEl = document.getElementById('r-verdict');
       const pointsEl  = document.getElementById('r-points');
       pointsEl.classList.remove('zero');
       if (yr.yourOption == null) {
-        // Player never submitted an answer for this question.
         verdictEl.textContent = "Time's up!";
         verdictEl.className = 'verdict timeup';
         pointsEl.textContent = '+0';
@@ -839,8 +841,6 @@
         pointsEl.classList.add('zero');
       }
 
-      // Options with green tick on correct, red cross on player's wrong pick.
-      // Other unselected options stay neutral (no badge, no color).
       const optsEl = document.getElementById('r-options');
       optsEl.innerHTML = '';
       const letters = ['A', 'B', 'C', 'D'];
@@ -870,12 +870,9 @@
       if (!myEmail) return;
       stopTimer();
       hideAnswerCounter();
-      // No score, no rank, no leaderboard — just the Thanks card.
-      // The board owns the post-game drama (top 10, podium reveal).
       showView('finished');
     });
 
-    // ===== Locked view sub-states =====
     function showAnswerLocked() {
       const icon = document.getElementById('locked-icon');
       icon.classList.remove('timeup');
@@ -893,7 +890,6 @@
       showView('locked');
     }
 
-    // ===== Reset event =====
     socket.on('state:reset', () => {
       myEmail = null; myCode = null;
       myFirstName = null; myLastName = null;
@@ -904,7 +900,6 @@
       stopTimer();
       hideAnswerCounter();
       clearSession();
-      // Reset both forms.
       firstNameInput.value = '';
       lastNameInput.value = '';
       emailInput.value = '';
@@ -917,12 +912,10 @@
       codeBtn.textContent = 'Join';
       hideLateJoinBanner();
       showResetBanner();
-      // Restore default lobby greeting (won't be visible again until rejoin).
       document.getElementById('lobby-greeting').textContent = "You're in.";
       showView('email');
     });
 
-    // ===== Banner helpers =====
     function showResetBanner() {
       hideLateJoinBanner();
       resetBanner.classList.remove('hidden');
@@ -944,7 +937,6 @@
       if (lateJoinBannerTimer) { clearTimeout(lateJoinBannerTimer); lateJoinBannerTimer = null; }
     }
 
-    // ===== Answer counter helpers =====
     function showAnswerCounter() {
       document.getElementById('q-answer-counter').classList.remove('hidden');
       document.getElementById('locked-answer-counter').classList.remove('hidden');
@@ -954,7 +946,6 @@
       document.getElementById('locked-answer-counter').classList.add('hidden');
     }
 
-    // ===== Timer helpers =====
     function startTimer(endsAtLocalMs) {
       stopTimer();
       const el = document.getElementById('q-timer');
