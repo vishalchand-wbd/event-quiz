@@ -18,6 +18,7 @@
       --text: #F4F6FA;
       --muted: #9AA4B8;
       --green: #22C58A;
+      --red: #E5484D;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -272,6 +273,10 @@
       border: 1px solid var(--line);
       border-radius: 24px;
       padding: 32px;
+      /* Defensive overflow — top 10 rows fit comfortably in the design budget
+         but if a smaller projector ever runs short we'd rather scroll than
+         visually clip the bottom rows. */
+      overflow-y: auto;
     }
     .reveal .leader-side h3 {
       margin: 0 0 18px;
@@ -279,11 +284,13 @@
       text-transform: uppercase; letter-spacing: 0.12em;
       color: var(--muted);
     }
+    /* Row spacing trimmed from R2 (14px / 8px) so 10 rows fit on a 1080p
+       projector with breathing room. Visual rhythm preserved. */
     .reveal .leader-row {
       display: flex; align-items: center; gap: 18px;
-      padding: 14px 16px;
+      padding: 10px 16px;
       border-radius: 12px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       background: rgba(255,255,255,0.02);
     }
     .reveal .leader-row .pos {
@@ -297,6 +304,9 @@
       font-size: clamp(16px, 1.4vw, 22px);
       font-weight: 700;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      /* Smooth filter transition so when Stage D removes the .blurred class
+         (on host:revealPodium), the unblur animates rather than jump-cuts. */
+      transition: filter 600ms ease-out;
     }
     .reveal .leader-row .pts {
       font-variant-numeric: tabular-nums;
@@ -304,10 +314,14 @@
       font-size: clamp(18px, 1.5vw, 26px);
       color: var(--brand);
     }
-    /* Empty-state placeholder for the leader-side card. Shown when there are
-       no players yet (defensive — in practice the reveal stage only appears
-       after at least one question, but the card shouldn't look broken if
-       somehow nobody has joined). */
+    /* Top 3 — names blurred to build tension. The position number and score
+       stay sharp, so the audience can see WHERE the leaders are without
+       knowing WHO they are. The reveal happens in Stage D (podium reveal). */
+    .reveal .leader-row.blurred .name {
+      filter: blur(10px);
+      user-select: none;
+    }
+    /* Empty-state placeholder for the leader-side card. */
     .reveal .leader-side .empty {
       padding: 24px 16px;
       color: var(--muted); font-style: italic;
@@ -455,7 +469,7 @@
         </div>
       </div>
       <div class="leader-side">
-        <h3>Top 5 — Live</h3>
+        <h3>Top 10 — Live</h3>
         <div id="leader-rows"></div>
       </div>
     </div>
@@ -488,9 +502,8 @@
     }
 
     // displayName(p) — render the player's name from the server payload.
-    // Falls back to "—" if name fields are absent. This shouldn't happen
-    // post-A1 (server validates firstName as required on join), but a JSONL
-    // replay of pre-A1 events could still produce records without names.
+    // Falls back to "—" if name fields are absent. Server validates firstName
+    // as required on join (A1), so this fallback is purely defensive.
     // We deliberately do NOT fall back to email — names-only per spec.
     function displayName(p) {
       if (!p) return '—';
@@ -611,12 +624,15 @@
       document.getElementById('r-q-text').textContent = r.questionText || '';
       document.getElementById('r-pct').textContent = (r.pctCorrect || 0);
 
-      // Bar chart — correct option in green, others in WBD blue.
+      // Bar chart — correct option in green, all incorrect in red. The shift
+      // from blue→red on incorrect makes the right answer pop more clearly
+      // and matches the player's per-question reveal coloring.
+      const styles = getComputedStyle(document.documentElement);
+      const greenColor = styles.getPropertyValue('--green').trim() || '#22C58A';
+      const redColor   = styles.getPropertyValue('--red').trim()   || '#E5484D';
       const letters = ['A', 'B', 'C', 'D'];
       const labels = letters.map((L, i) => `${L}. ${(r.options && r.options[i]) || ''}`);
-      const colors = labels.map((_, i) => i === r.correctOption
-        ? getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#22C58A'
-        : getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#0064FF');
+      const colors = labels.map((_, i) => i === r.correctOption ? greenColor : redColor);
 
       if (revealChart) revealChart.destroy();
       const ctx = document.getElementById('reveal-chart').getContext('2d');
@@ -657,12 +673,13 @@
         },
       });
 
+      // Top 10 leaderboard with positions 1–3 blurred. The "no padding" rule
+      // (slice + forEach) renders exactly as many rows as there are players;
+      // empty state shown only if the leaderboard is genuinely empty.
       const lb = r.leaderboard || [];
       const lbEl = document.getElementById('leader-rows');
       lbEl.innerHTML = '';
-      // No-padding rule: render only as many rows as there are players. With 0
-      // players, show a small placeholder rather than an empty card.
-      const list = lb.slice(0, 5);
+      const list = lb.slice(0, 10);
       if (list.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'empty';
@@ -671,7 +688,10 @@
       } else {
         list.forEach((p, i) => {
           const row = document.createElement('div');
-          row.className = 'leader-row';
+          // Blur first 3 names regardless of how many players are on the
+          // board — with only 1 player they're rank 1 and blurred; same
+          // rule applies all the way up. Names are sharp from rank 4 onward.
+          row.className = 'leader-row' + (i < 3 ? ' blurred' : '');
           row.innerHTML =
             `<span class="pos">${i + 1}</span>` +
             `<span class="name">${escapeHtml(displayName(p))}</span>` +
