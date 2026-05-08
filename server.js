@@ -5,30 +5,43 @@
  *
  * One Node process, in-memory state, JSONL persistence for crash recovery.
  *
- * State machine (post Stage E — two-phase question display):
+ * State machine (post Stage D — finished + podium reveal):
  *   lobby --advance--> preview --advance--> active --(timer expires)--> closed
  *                                                  \                       |
  *                                                   \--(early reveal)--/   |
  *                                                                          |
  *   closed --reveal--> revealed --advance--> preview(next) OR finished
  *
- *   ANY state --host:reset--> lobby (clears all players, scores, timers,
- *                                    and rotates the room code)
+ *   finished --host:revealPodium--> finished + podiumRevealed=true
+ *                                   (sub-flag, NOT a new state — game is
+ *                                    semantically still FINISHED)
  *
- * Fourteen Socket.IO events:
- *   Client → Server: player:join, player:answer, host:advance, host:reveal, host:reset
+ *   ANY state --host:reset--> lobby (clears all players, scores, timers,
+ *                                    rotates the room code, clears the
+ *                                    podiumRevealed flag)
+ *
+ * Sixteen Socket.IO events:
+ *   Client → Server: player:join, player:answer,
+ *                    host:advance, host:reveal, host:revealPodium, host:reset
  *   Server → Client: state:lobby, state:question_preview, state:question,
  *                    state:answerCount, state:reveal, state:finished,
- *                    state:reset, state:meta, error
+ *                    state:podiumRevealed, state:reset, state:meta, error
  *
- * Two-phase question display:
- *   - host:advance from LOBBY/REVEALED transitions to PREVIEW (text shown,
- *     no timer, no answers accepted). Emits state:question_preview.
- *   - host:advance from PREVIEW transitions to ACTIVE (timer starts,
- *     options revealed, answers accepted). Emits state:question.
+ * Two-phase question display (Stage E):
+ *   - host:advance from LOBBY/REVEALED → PREVIEW (text shown, no timer)
+ *   - host:advance from PREVIEW → ACTIVE (timer starts, options revealed)
  *   - state:question_preview is role-aware: /board sees text, /host sees
- *     text+options, /play sees ONLY the index/total (the player looks at
- *     the projector for the question text — by design).
+ *     text+options, /play sees ONLY {index, total} (player looks at projector)
+ *
+ * Podium reveal flow (Stage D):
+ *   - When state enters FINISHED, /board shows top 10 with top 3 names blurred
+ *     plus a "Thanks for participating" message.
+ *   - Host clicks "Reveal Podium" → state:podiumRevealed broadcasts to all
+ *     clients → /board animates list-to-pillars transformation with confetti.
+ *   - state:finished payload includes top10 (renamed from podium, bumped from
+ *     5 to 10 entries) AND a podiumRevealed boolean. Reconnects mid-game-
+ *     with-revealed-podium get the post-celebration UI without replaying the
+ *     animation.
  *
  * Room code:
  *   - 4-digit numeric code generated once at boot (or restored from JSONL replay)
@@ -60,7 +73,7 @@ const { Server } = require('socket.io');
 const persistence = require('./persistence');
 
 // =====================================================================
-// CONFIGURATION (override via environment variables in the systemd unit)
+// CONFIGURATION
 // =====================================================================
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -114,10 +127,10 @@ function validateQuiz(q) {
 
 const STATE = Object.freeze({
   LOBBY: 'lobby',
-  PREVIEW: 'preview',       // question text shown but no options/timer; awaiting host's second click
-  ACTIVE: 'active',         // question + options shown, timer running, accepting answers
-  CLOSED: 'closed',         // timer expired (or early-revealed); no more answers
-  REVEALED: 'revealed',     // results shown; waiting for host to advance
+  PREVIEW: 'preview',
+  ACTIVE: 'active',
+  CLOSED: 'closed',
+  REVEALED: 'revealed',
   FINISHED: 'finished',
 });
 
@@ -130,6 +143,10 @@ const game = {
   players: new Map(),         // email -> { email, firstName, lastName, joinedAt, score, answers: Map }
   currentAnswers: new Map(),  // email -> answer record, JUST for the current question
   closeTimer: null,
+  // Stage D: sub-flag of FINISHED. False at game start; flipped true by host's
+  // Reveal Podium click. Cleared on reset. Persisted via 'podium_revealed'
+  // event so server reboots in mid-finished-with-revealed-podium correctly.
+  podiumRevealed: false,
 };
 
 // =====================================================================
@@ -196,9 +213,6 @@ function applyEvent(event) {
     }
 
     case 'question_previewed': {
-      // Stage E: PREVIEW state. Question text exposed to /board and /host
-      // but timer is not running and answers are not accepted. The host
-      // clicks Advance again to transition into ACTIVE.
       game.state = STATE.PREVIEW;
       game.currentIndex = event.index;
       game.currentStartedAt = null;
@@ -208,17 +222,10 @@ function applyEvent(event) {
     }
 
     case 'question_started': {
-      // PREVIEW → ACTIVE (or, when replaying old pre-Stage-E JSONL events,
-      // LOBBY/REVEALED → ACTIVE directly — both end in the right place
-      // because applyEvent doesn't enforce transition validity).
       game.state = STATE.ACTIVE;
-      // Old events carry index; new events also carry index for backward
-      // compat. Either way we use event.index.
       game.currentIndex = event.index;
       game.currentStartedAt = event.ts;
       game.currentEndsAt = event.ts + quiz.questions[event.index].durationMs;
-      // currentAnswers may already be empty from question_previewed; reset
-      // again here for the old-events path where preview was skipped.
       game.currentAnswers = new Map();
       break;
     }
@@ -260,6 +267,17 @@ function applyEvent(event) {
 
     case 'finished': {
       game.state = STATE.FINISHED;
+      // podiumRevealed stays false on entering FINISHED; flipped only by an
+      // explicit 'podium_revealed' event later. We do NOT reset it to false
+      // here in case a replay sequence is finished→podium_revealed (the flag
+      // would get clobbered). On a clean game start, the flag is already
+      // false from boot or from the previous reset.
+      break;
+    }
+
+    case 'podium_revealed': {
+      // Stage D: host triggered the celebration. Idempotent on replay.
+      game.podiumRevealed = true;
       break;
     }
 
@@ -270,6 +288,8 @@ function applyEvent(event) {
       game.currentEndsAt = null;
       game.players = new Map();
       game.currentAnswers = new Map();
+      // Stage D: clear podium reveal flag so the next game starts blurred.
+      game.podiumRevealed = false;
       break;
     }
 
@@ -305,11 +325,6 @@ function buildQuestionPayload() {
   };
 }
 
-// Role-aware preview payload. Players see only the question NUMBER (they
-// look at the projector for the text — by design, building tension and
-// preventing screen-glance cheating). /board sees the question text but
-// not options. /host sees both text and options so the moderator can read
-// and prep for the reveal-options click.
 function buildQuestionPreviewPayload(role) {
   const q = quiz.questions[game.currentIndex];
   const base = {
@@ -379,6 +394,16 @@ function buildPlayerRevealPayload(email, publicCache, rankByEmail) {
   return Object.assign({}, base, { yourResult });
 }
 
+// Stage D: state:finished payload. Renamed `podium` → `top10` and bumped from
+// top 5 to top 10. Includes the podiumRevealed flag so reconnecting clients
+// render the right phase (blurred list vs revealed pillars) without animation.
+function buildFinishedPayload() {
+  return {
+    top10: getLeaderboard(10),
+    podiumRevealed: game.podiumRevealed,
+  };
+}
+
 // =====================================================================
 // BROADCASTS
 // =====================================================================
@@ -390,7 +415,6 @@ function broadcastState() {
       break;
 
     case STATE.PREVIEW: {
-      // Role-aware emit: /board, /host, /play each get a different payload.
       io.to('board').emit('state:question_preview', buildQuestionPreviewPayload('board'));
       io.to('host').emit('state:question_preview', buildQuestionPreviewPayload('host'));
       const playerPayload = buildQuestionPreviewPayload('player');
@@ -425,7 +449,7 @@ function broadcastState() {
     }
 
     case STATE.FINISHED:
-      io.emit('state:finished', { podium: getLeaderboard(5) });
+      io.emit('state:finished', buildFinishedPayload());
       break;
   }
 }
@@ -457,13 +481,15 @@ function sendCurrentStateTo(socket) {
       }
       break;
     case STATE.FINISHED:
-      socket.emit('state:finished', { podium: getLeaderboard(5) });
+      // The flag in the payload tells the client which phase to render.
+      // No state:podiumRevealed sent — that's only for live transitions.
+      socket.emit('state:finished', buildFinishedPayload());
       break;
   }
 }
 
 // =====================================================================
-// THROTTLED ANSWER COUNT BROADCASTS
+// THROTTLED BROADCASTS
 // =====================================================================
 
 let answerCountTimer = null;
@@ -531,8 +557,6 @@ function closeCurrentQuestion() {
 // =====================================================================
 
 function hostAdvance() {
-  // From LOBBY or REVEALED: enter PREVIEW for the next question (or finish
-  // if no more questions remain).
   if (game.state === STATE.LOBBY || game.state === STATE.REVEALED) {
     const nextIndex = game.currentIndex + 1;
     if (nextIndex >= quiz.questions.length) {
@@ -545,12 +569,11 @@ function hostAdvance() {
     return;
   }
 
-  // From PREVIEW: transition to ACTIVE (start timer, open answers).
   if (game.state === STATE.PREVIEW) {
     recordAndPersist({
       type: 'question_started',
       ts: Date.now(),
-      index: game.currentIndex,  // already set by question_previewed
+      index: game.currentIndex,
     });
     scheduleAutoClose();
     broadcastState();
@@ -581,6 +604,23 @@ function hostReveal() {
     index: game.currentIndex,
   });
   broadcastState();
+}
+
+// Stage D: host triggers the podium celebration. Only valid in FINISHED state.
+// Idempotent — duplicate clicks are no-ops (don't error, don't re-broadcast).
+function hostRevealPodium() {
+  if (game.state !== STATE.FINISHED) {
+    throw new Error(`Cannot reveal podium from state "${game.state}"`);
+  }
+  if (game.podiumRevealed) {
+    // Already revealed; no-op. This makes the action safe to retry from the
+    // host UI without worrying about replaying the celebration.
+    return;
+  }
+  recordAndPersist({ type: 'podium_revealed', ts: Date.now() });
+  // Animation trigger only — clients already have the top10 data from
+  // state:finished. No payload needed.
+  io.emit('state:podiumRevealed', {});
 }
 
 function hostReset() {
@@ -627,6 +667,7 @@ app.get('/board', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'board.html'
 app.get('/health', (_req, res) => res.json({
   status: 'ok',
   state: game.state,
+  podiumRevealed: game.podiumRevealed,
   roomCode: game.roomCode,
   currentIndex: game.currentIndex,
   playerCount: game.players.size,
@@ -710,8 +751,6 @@ io.on('connection', (socket) => {
       return safeAck(ack, { ok: false, error: 'INVALID_LAST_NAME' });
     }
 
-    // Late-join: PREVIEW counts as past-lobby. Only existing players (who
-    // joined during LOBBY) can rejoin from PREVIEW/ACTIVE/CLOSED/REVEALED.
     if (game.state !== STATE.LOBBY && !game.players.has(email)) {
       return safeAck(ack, { ok: false, error: 'GAME_STARTED' });
     }
@@ -786,6 +825,19 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Stage D: new host action. Triggers the podium celebration on /board.
+  socket.on('host:revealPodium', (_payload, ack) => {
+    if (socket.data.role !== 'host') {
+      return safeAck(ack, { ok: false, error: 'Not authorized' });
+    }
+    try {
+      hostRevealPodium();
+      safeAck(ack, { ok: true });
+    } catch (e) {
+      safeAck(ack, { ok: false, error: e.message });
+    }
+  });
+
   socket.on('host:reset', (_payload, ack) => {
     if (socket.data.role !== 'host') {
       return safeAck(ack, { ok: false, error: 'Not authorized' });
@@ -819,10 +871,8 @@ function replayFromDisk() {
   const elapsedMs = Date.now() - startMs;
   console.log(`Replayed ${count} events in ${elapsedMs}ms. ` +
     `state=${game.state}, players=${game.players.size}, currentIndex=${game.currentIndex}, ` +
-    `roomCode=${game.roomCode || '(none yet)'}`);
+    `podiumRevealed=${game.podiumRevealed}, roomCode=${game.roomCode || '(none yet)'}`);
 
-  // Resume timer if we crashed mid-ACTIVE. PREVIEW has no timer to resume —
-  // host advances manually after reboot.
   if (game.state === STATE.ACTIVE) {
     scheduleAutoClose();
   }
