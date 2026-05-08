@@ -30,7 +30,6 @@
     }
     body { min-height: 100vh; }
 
-    /* Top bar */
     .topbar {
       background: var(--brand); color: #fff;
       padding: 14px 24px;
@@ -64,7 +63,6 @@
 
     main { max-width: 960px; margin: 0 auto; padding: 28px 24px; }
 
-    /* Cards */
     .card {
       background: var(--surface);
       border: 1px solid var(--line);
@@ -80,7 +78,6 @@
       margin: 0 0 24px; color: var(--muted); font-size: 14px;
     }
 
-    /* Token gate */
     .token-form { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
     .token-form label {
       font-size: 13px; font-weight: 700; color: var(--muted);
@@ -113,7 +110,6 @@
 
     .err { color: var(--red); font-size: 14px; min-height: 18px; }
 
-    /* Stats grid */
     .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -137,7 +133,6 @@
     }
     .stat .value.large { font-size: 44px; }
 
-    /* Question display */
     .q-display {
       padding: 22px 24px;
       background: var(--bg);
@@ -156,6 +151,7 @@
     }
     .q-display .opts {
       display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      transition: opacity 200ms ease-out;
     }
     .q-display .opt {
       padding: 12px 14px;
@@ -176,8 +172,11 @@
       border-color: var(--green);
     }
     .q-display .opt.correct .letter { background: var(--green); }
+    /* During PREVIEW, the host sees the options dimmed — visual cue that
+       they haven't been revealed to players yet. The moderator clicks
+       Advance again to flip them to full opacity (and start the timer). */
+    .q-display.preview .opts { opacity: 0.55; }
 
-    /* Action row */
     .actions {
       display: flex; gap: 12px;
       padding-top: 20px;
@@ -187,7 +186,6 @@
     .actions .btn { min-width: 160px; }
     .actions .spacer { flex: 1; }
 
-    /* Status badge */
     .badge {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 4px 10px; border-radius: 999px;
@@ -195,6 +193,9 @@
       text-transform: uppercase; letter-spacing: 0.06em;
     }
     .badge.lobby    { background: rgba(0,100,255,0.10); color: var(--brand); }
+    /* Stage E: subtle amber tint for PREVIEW — distinguishable from lobby
+       (blue), more muted than active (full amber). Reads as "warming up". */
+    .badge.preview  { background: rgba(245,158,11,0.08); color: #B45309; }
     .badge.active   { background: rgba(245,158,11,0.12); color: var(--amber); }
     .badge.closed   { background: rgba(229,72,77,0.10);  color: var(--red); }
     .badge.revealed { background: rgba(21,184,134,0.12); color: var(--green); }
@@ -209,8 +210,6 @@
       50%     { opacity: 1;   transform: scale(1.1); }
     }
 
-    /* Room code — small reference for the moderator, sits below the state
-       badge in the header row. */
     .header-meta {
       display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
     }
@@ -228,7 +227,6 @@
       margin-left: 4px;
     }
 
-    /* Reveal card */
     .reveal-leaderboard {
       margin-top: 18px;
     }
@@ -259,7 +257,6 @@
       padding: 14px 0; color: var(--muted); font-size: 14px; font-style: italic;
     }
 
-    /* Transient toast for reset confirmation */
     .toast {
       position: fixed; left: 50%; bottom: 32px;
       transform: translateX(-50%) translateY(20px);
@@ -291,7 +288,6 @@
 
   <main>
 
-    <!-- 1. Token gate -->
     <section id="view-token" class="card">
       <h2>Moderator access</h2>
       <p class="sub">Enter the host token printed by <code>install.sh</code> at deploy time.</p>
@@ -305,7 +301,6 @@
       </form>
     </section>
 
-    <!-- 2. Connected — game state -->
     <section id="view-game" class="card hidden">
       <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 24px;">
         <div>
@@ -333,14 +328,12 @@
         </div>
       </div>
 
-      <!-- Current question display (shown during ACTIVE / CLOSED / REVEALED) -->
       <div class="q-display hidden" id="q-display">
-        <div class="q-meta">Current Question</div>
+        <div class="q-meta" id="q-meta">Current Question</div>
         <h3 class="q-text" id="q-text">…</h3>
         <div class="opts" id="q-opts"></div>
       </div>
 
-      <!-- Reveal leaderboard (shown during REVEALED) -->
       <div class="reveal-leaderboard hidden" id="reveal-leaderboard">
         <h3>Top 5 right now</h3>
         <div id="leaderboard-body"></div>
@@ -361,7 +354,6 @@
   <script>
     'use strict';
 
-    // ===== DOM refs =====
     const viewToken  = document.getElementById('view-token');
     const viewGame   = document.getElementById('view-game');
     const tokenForm  = document.getElementById('token-form');
@@ -377,6 +369,7 @@
     const statMid    = document.getElementById('stat-mid');
     const statTime   = document.getElementById('stat-time');
     const qDisplay   = document.getElementById('q-display');
+    const qMeta      = document.getElementById('q-meta');
     const qText      = document.getElementById('q-text');
     const qOpts      = document.getElementById('q-opts');
     const lbWrap     = document.getElementById('reveal-leaderboard');
@@ -386,18 +379,16 @@
     const btnReset   = document.getElementById('btn-reset');
     const toast      = document.getElementById('toast');
 
-    // ===== Local state =====
     let socket = null;
     let hostToken = null;
     let serverState = 'lobby';      // mirrors server's state machine
-    let lastQuestion = null;        // last state:question payload
-    let lastReveal   = null;        // last state:reveal payload
+    let lastQuestion = null;        // last state:question OR state:question_preview payload
+    let lastReveal   = null;
     let lastAnswerCount = { count: 0, total: 0 };
+    let lastPlayerCount = 0;        // remembered from state:lobby for display during PREVIEW
     let timerInterval = null;
     let toastTimer = null;
 
-    // ===== Token gate =====
-    // Allow ?token=... in URL for one-click access from a saved bookmark.
     const urlToken = new URLSearchParams(window.location.search).get('token');
     if (urlToken) {
       tokenInput.value = urlToken;
@@ -433,7 +424,7 @@
       socket.on('disconnect', () => {
         connStatus.classList.remove('online'); connStatus.classList.add('offline');
         connText.textContent = 'Disconnected — reconnecting…';
-        updateButtonState();   // disable buttons while disconnected
+        updateButtonState();
       });
 
       socket.on('connect_error', (err) => {
@@ -444,7 +435,6 @@
       });
 
       socket.on('error', (err) => {
-        // Server sent an error event (likely auth).
         if (err && err.message) {
           tokenErr.textContent = err.message;
           viewToken.classList.remove('hidden');
@@ -452,8 +442,6 @@
         }
       });
 
-      // Room code arrives via state:meta — emitted on connect
-      // (sendCurrentStateTo emits it first) and again after every host:reset.
       socket.on('state:meta', (m) => {
         roomCodeEl.textContent = (m && m.code) || '—';
       });
@@ -462,20 +450,44 @@
         serverState = 'lobby';
         lastQuestion = null;
         lastReveal = null;
+        lastPlayerCount = p.playerCount || 0;
         statQ.textContent = '—';
         statMidLab.textContent = 'Players Joined';
-        statMid.textContent = (p.playerCount || 0).toLocaleString();
+        statMid.textContent = lastPlayerCount.toLocaleString();
         statTime.textContent = '—';
         qDisplay.classList.add('hidden');
+        qDisplay.classList.remove('preview');
         lbWrap.classList.add('hidden');
         setBadge('lobby', 'Lobby');
         stopTimer();
         updateButtonState();
       });
 
+      // Stage E: question_preview phase. Host sees the question text + options
+      // (dimmed via .preview class on q-display), but no timer is running and
+      // no answers are accepted. The next host:advance starts the timer.
+      socket.on('state:question_preview', (q) => {
+        serverState = 'preview';
+        lastQuestion = q;
+        lastReveal = null;
+
+        statQ.textContent = `${(q.index || 0) + 1} / ${q.total}`;
+        statMidLab.textContent = 'Players Joined';
+        statMid.textContent = lastPlayerCount.toLocaleString();
+        statTime.textContent = '—';
+
+        qMeta.textContent = 'Preview — options hidden from players';
+        renderQuestion(q, null);
+        qDisplay.classList.add('preview');
+        qDisplay.classList.remove('hidden');
+        lbWrap.classList.add('hidden');
+
+        setBadge('preview', 'Preview');
+        stopTimer();
+        updateButtonState();
+      });
+
       socket.on('state:question', (q) => {
-        // Server doesn't separately broadcast lobby→active vs active→closed when only the
-        // timer expires — we infer state from whether we're past q.endsAt.
         serverState = (Date.now() < q.endsAt) ? 'active' : 'closed';
         lastQuestion = q;
         lastReveal = null;
@@ -483,7 +495,9 @@
         statQ.textContent = `${q.index + 1} / ${q.total}`;
         statMidLab.textContent = 'Answers In';
         statMid.textContent = `${lastAnswerCount.count.toLocaleString()} / ${lastAnswerCount.total.toLocaleString()}`;
+        qMeta.textContent = 'Current Question';
         renderQuestion(q, null);
+        qDisplay.classList.remove('preview');
         qDisplay.classList.remove('hidden');
         lbWrap.classList.add('hidden');
 
@@ -496,12 +510,10 @@
 
       socket.on('state:answerCount', (a) => {
         lastAnswerCount = { count: a.count || 0, total: a.total || 0 };
-        // Only update the visible counter if a question is the current focus.
         if (serverState === 'active' || serverState === 'closed') {
           statMidLab.textContent = 'Answers In';
           statMid.textContent = `${lastAnswerCount.count.toLocaleString()} / ${lastAnswerCount.total.toLocaleString()}`;
         }
-        // The server marks the final flush after timer expiry — flip our local view to "closed".
         if (a.final) {
           serverState = 'closed';
           stopTimer();
@@ -514,7 +526,9 @@
       socket.on('state:reveal', (r) => {
         serverState = 'revealed';
         lastReveal = r;
+        qMeta.textContent = 'Current Question';
         renderQuestion(lastQuestion || { text: r.questionText, options: r.options }, r.correctOption);
+        qDisplay.classList.remove('preview');
         qDisplay.classList.remove('hidden');
         renderLeaderboard(r.leaderboard || []);
         lbWrap.classList.remove('hidden');
@@ -533,6 +547,7 @@
         statMid.textContent = 'Done';
         statTime.textContent = '—';
         qDisplay.classList.add('hidden');
+        qDisplay.classList.remove('preview');
         renderLeaderboard(f.podium || []);
         lbWrap.classList.remove('hidden');
         setBadge('finished', 'Finished');
@@ -540,9 +555,6 @@
       });
 
       socket.on('state:reset', () => {
-        // Server is about to follow up with state:meta (new code) and state:lobby;
-        // those handlers do the real UI rebuild. We just flash a confirmation toast
-        // so the moderator sees something happened, plus belt-and-braces local cleanup.
         lastAnswerCount = { count: 0, total: 0 };
         lastQuestion = null;
         lastReveal = null;
@@ -550,13 +562,6 @@
       });
     }
 
-    // ===== Rendering helpers =====
-
-    // displayName(p) — render the player's name from the server payload.
-    // Falls back to "—" if name fields are absent. This shouldn't happen
-    // post-A1 (server validates firstName as required on join), but a JSONL
-    // replay of pre-A1 events could still produce records without names.
-    // We deliberately do NOT fall back to email — names-only per spec.
     function displayName(p) {
       if (!p) return '—';
       const first = (p.firstName || '').trim();
@@ -584,9 +589,6 @@
 
     function renderLeaderboard(rows) {
       lbBody.innerHTML = '';
-      // No-padding rule: render only as many rows as there are players.
-      // If the leaderboard is empty, show a small placeholder so the card
-      // doesn't look like a render bug to the moderator.
       const list = (rows || []).slice(0, 5);
       if (list.length === 0) {
         const empty = document.createElement('div');
@@ -613,7 +615,6 @@
       toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
     }
 
-    // ===== Buttons =====
     btnAdvance.addEventListener('click', () => {
       if (btnAdvance.disabled) return;
       socket.emit('host:advance', {}, (ack) => {
@@ -623,7 +624,6 @@
 
     btnReveal.addEventListener('click', () => {
       if (btnReveal.disabled) return;
-      // If the question is still active, ask before doing an early reveal — easy to misclick.
       if (serverState === 'active') {
         if (!confirm('Question is still live. Reveal early and cut off remaining answers?')) return;
       }
@@ -634,8 +634,6 @@
 
     btnReset.addEventListener('click', () => {
       if (btnReset.disabled) return;
-      // Different copy for end-of-game vs mid-game so the moderator gets a
-      // clearer mental picture of what "reset" means in each context.
       const msg = (serverState === 'finished')
         ? 'Start a new game?\n\nThis clears all players and scores from the previous round so a fresh game can begin. A new room code will be generated.'
         : 'Reset the game NOW?\n\nThis will clear all players and scores immediately, and rotate the room code. Use this only if the current game is unrecoverable. This cannot be undone.';
@@ -647,20 +645,24 @@
 
     function updateButtonState() {
       const connected = socket && socket.connected;
-      // ADVANCE: valid from lobby (start) or revealed (next).
-      btnAdvance.disabled = !connected || (serverState !== 'lobby' && serverState !== 'revealed');
+
+      // ADVANCE: valid from lobby (start), preview (reveal options), or revealed (next).
+      btnAdvance.disabled = !connected || (
+        serverState !== 'lobby' &&
+        serverState !== 'preview' &&
+        serverState !== 'revealed'
+      );
       btnAdvance.textContent =
         serverState === 'lobby'    ? 'Start Quiz' :
+        serverState === 'preview'  ? 'Reveal Options' :
         serverState === 'revealed' && lastQuestion && lastQuestion.index === lastQuestion.total - 1 ? 'Show Final Results' :
         serverState === 'revealed' ? 'Next Question' :
         serverState === 'finished' ? 'Finished' : 'Advance';
 
-      // REVEAL: valid from active (early) or closed.
+      // REVEAL: valid from active (early) or closed. PREVIEW does NOT allow reveal.
       btnReveal.disabled  = !connected || (serverState !== 'active' && serverState !== 'closed');
       btnReveal.textContent = serverState === 'active' ? 'Reveal Early' : 'Reveal';
 
-      // RESET: always usable when connected. Promoted to btn-primary at the end
-      // of the game so it becomes the obvious next action; otherwise secondary.
       btnReset.disabled = !connected;
       if (serverState === 'finished') {
         btnReset.className = 'btn btn-primary';
@@ -671,7 +673,6 @@
       }
     }
 
-    // ===== Timer =====
     function startTimer(endsAtLocalMs) {
       stopTimer();
       function tick() {
