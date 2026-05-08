@@ -209,6 +209,26 @@
       50%     { opacity: 1;   transform: scale(1.1); }
     }
 
+    /* Room code — small reference for the moderator, sits below the state
+       badge in the header row. Not a full stat tile — the room code is meta
+       (which game session is this?) rather than a metric of the current game. */
+    .header-meta {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+    }
+    .room-code {
+      font-size: 13px; font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .room-code .num {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 700;
+      color: var(--brand);
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      margin-left: 4px;
+    }
+
     /* Reveal card */
     .reveal-leaderboard {
       margin-top: 18px;
@@ -287,7 +307,10 @@
           <h2 style="margin-bottom: 0;">Game Console</h2>
           <p class="sub" style="margin-bottom: 0;">Server-authoritative scoring. Every action below is persisted.</p>
         </div>
-        <span class="badge lobby" id="state-badge"><span class="pulse"></span><span id="state-text">Lobby</span></span>
+        <div class="header-meta">
+          <span class="badge lobby" id="state-badge"><span class="pulse"></span><span id="state-text">Lobby</span></span>
+          <span class="room-code">Room code:<span class="num" id="host-room-code">—</span></span>
+        </div>
       </div>
 
       <div class="stats">
@@ -343,6 +366,7 @@
     const connText   = document.getElementById('conn-text');
     const stateBadge = document.getElementById('state-badge');
     const stateText  = document.getElementById('state-text');
+    const roomCodeEl = document.getElementById('host-room-code');
     const statQ      = document.getElementById('stat-q');
     const statMidLab = document.getElementById('stat-mid-label');
     const statMid    = document.getElementById('stat-mid');
@@ -421,6 +445,12 @@
           viewToken.classList.remove('hidden');
           viewGame.classList.add('hidden');
         }
+      });
+
+      // Room code arrives via state:meta — emitted on connect (sendCurrentStateTo
+      // emits it first) and again after every host:reset (when the code rotates).
+      socket.on('state:meta', (m) => {
+        roomCodeEl.textContent = (m && m.code) || '—';
       });
 
       socket.on('state:lobby', (p) => {
@@ -505,9 +535,9 @@
       });
 
       socket.on('state:reset', () => {
-        // Server is about to follow up with state:lobby; that handler does the
-        // real UI rebuild. We just flash a confirmation toast so the moderator
-        // sees something happened, plus belt-and-braces local state cleanup.
+        // Server is about to follow up with state:meta (new code) and state:lobby;
+        // those handlers do the real UI rebuild. We just flash a confirmation toast
+        // so the moderator sees something happened, plus belt-and-braces local cleanup.
         lastAnswerCount = { count: 0, total: 0 };
         lastQuestion = null;
         lastReveal = null;
@@ -577,8 +607,8 @@
       // Different copy for end-of-game vs mid-game so the moderator gets a
       // clearer mental picture of what "reset" means in each context.
       const msg = (serverState === 'finished')
-        ? 'Start a new game?\n\nThis clears all players and scores from the previous round so a fresh game can begin.'
-        : 'Reset the game NOW?\n\nThis will clear all players and scores immediately. Use this only if the current game is unrecoverable. This cannot be undone.';
+        ? 'Start a new game?\n\nThis clears all players and scores from the previous round so a fresh game can begin. A new room code will be generated.'
+        : 'Reset the game NOW?\n\nThis will clear all players and scores immediately, and rotate the room code. Use this only if the current game is unrecoverable. This cannot be undone.';
       if (!confirm(msg)) return;
       socket.emit('host:reset', {}, (ack) => {
         if (!ack || !ack.ok) console.warn('reset rejected:', ack && ack.error);
