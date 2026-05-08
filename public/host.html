@@ -210,8 +210,7 @@
     }
 
     /* Room code — small reference for the moderator, sits below the state
-       badge in the header row. Not a full stat tile — the room code is meta
-       (which game session is this?) rather than a metric of the current game. */
+       badge in the header row. */
     .header-meta {
       display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
     }
@@ -249,9 +248,15 @@
       display: inline-flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 13px;
     }
-    .reveal-leaderboard .email { flex: 1; font-weight: 600; }
+    .reveal-leaderboard .name {
+      flex: 1; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .reveal-leaderboard .pts {
       font-variant-numeric: tabular-nums; font-weight: 700;
+    }
+    .reveal-leaderboard .empty {
+      padding: 14px 0; color: var(--muted); font-size: 14px; font-style: italic;
     }
 
     /* Transient toast for reset confirmation */
@@ -447,8 +452,8 @@
         }
       });
 
-      // Room code arrives via state:meta — emitted on connect (sendCurrentStateTo
-      // emits it first) and again after every host:reset (when the code rotates).
+      // Room code arrives via state:meta — emitted on connect
+      // (sendCurrentStateTo emits it first) and again after every host:reset.
       socket.on('state:meta', (m) => {
         roomCodeEl.textContent = (m && m.code) || '—';
       });
@@ -545,7 +550,21 @@
       });
     }
 
-    // ===== Rendering =====
+    // ===== Rendering helpers =====
+
+    // displayName(p) — render the player's name from the server payload.
+    // Falls back to "—" if name fields are absent. This shouldn't happen
+    // post-A1 (server validates firstName as required on join), but a JSONL
+    // replay of pre-A1 events could still produce records without names.
+    // We deliberately do NOT fall back to email — names-only per spec.
+    function displayName(p) {
+      if (!p) return '—';
+      const first = (p.firstName || '').trim();
+      const last  = (p.lastName  || '').trim();
+      const full = (first + ' ' + last).trim();
+      return full || '—';
+    }
+
     function setBadge(cls, text) {
       stateBadge.className = 'badge ' + cls;
       stateBadge.innerHTML = `<span class="pulse"></span><span>${text}</span>`;
@@ -565,13 +584,24 @@
 
     function renderLeaderboard(rows) {
       lbBody.innerHTML = '';
-      rows.slice(0, 5).forEach((p, i) => {
+      // No-padding rule: render only as many rows as there are players.
+      // If the leaderboard is empty, show a small placeholder so the card
+      // doesn't look like a render bug to the moderator.
+      const list = (rows || []).slice(0, 5);
+      if (list.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No players have scored yet.';
+        lbBody.appendChild(empty);
+        return;
+      }
+      list.forEach((p, i) => {
         const row = document.createElement('div');
         row.className = 'row';
         row.innerHTML =
           `<span class="pos">${i + 1}</span>` +
-          `<span class="email">${escapeHtml(p.email)}</span>` +
-          `<span class="pts">${p.score.toLocaleString()}</span>`;
+          `<span class="name">${escapeHtml(displayName(p))}</span>` +
+          `<span class="pts">${(p.score || 0).toLocaleString()}</span>`;
         lbBody.appendChild(row);
       });
     }
