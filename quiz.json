@@ -2,27 +2,40 @@
   "title": "Office Inauguration Quiz",
   "questions": [
     {
-      "text": "Which planet in our solar system has the most known moons?",
-      "options": ["Jupiter", "Saturn", "Uranus", "Neptune"],
+      "text": "Which animal has three hearts?",
+      "options": ["Octopus", "Shark", "Blue Whale", "Crocodile"],
+      "correctOption": 0,
+      "durationMs": 20000
+    },
+    {
+      "text": "What is the only food that never spoils naturally?",
+      "options": ["Salt", "Honey", "Rice", "Sugar"],
       "correctOption": 1,
       "durationMs": 20000
     },
     {
-      "text": "What does the acronym HTTP stand for?",
-      "options": [
-        "HyperText Transfer Protocol",
-        "HighTech Transport Protocol",
-        "Hyperlink Tracking Procedure",
-        "Home Tool Transfer Process"
-      ],
-      "correctOption": 0,
-      "durationMs": 15000
+      "text": "Which country has a time zone that is 45 minutes offset from UTC?",
+      "options": ["India", "Nepal", "China", "Australia"],
+      "correctOption": 1,
+      "durationMs": 20000
     },
     {
-      "text": "In which year did the first human-made object reach interstellar space?",
-      "options": ["1977", "1998", "2012", "2025"],
+      "text": "Warner Bros. Pictures was founded in which year?",
+      "options": ["1913", "1923", "1933", "1943"],
+      "correctOption": 1,
+      "durationMs": 20000
+    },
+    {
+      "text": "Which planet has the shortest day in our solar system?",
+      "options": ["Earth", "Mars", "Jupiter", "Saturn"],
       "correctOption": 2,
-      "durationMs": 25000
+      "durationMs": 20000
+    },
+    {
+      "text": "Fun Question: What is the most common phrase in online meetings?",
+      "options": ["You're on mute", "Let's circle back", "Can you see my screen?", "All of the above"],
+      "correctOption": 3,
+      "durationMs": 20000
     }
   ]
 }
