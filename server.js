@@ -5,20 +5,30 @@
  *
  * One Node process, in-memory state, JSONL persistence for crash recovery.
  *
- * State machine:
- *   lobby --advance--> active --(timer expires)--> closed --reveal--> revealed
- *                                  \                                       |
- *                                   \--(early reveal)-----------------/    |
+ * State machine (post Stage E — two-phase question display):
+ *   lobby --advance--> preview --advance--> active --(timer expires)--> closed
+ *                                                  \                       |
+ *                                                   \--(early reveal)--/   |
  *                                                                          |
- *   revealed --advance--> active(next)  OR  finished
+ *   closed --reveal--> revealed --advance--> preview(next) OR finished
  *
  *   ANY state --host:reset--> lobby (clears all players, scores, timers,
  *                                    and rotates the room code)
  *
- * Thirteen Socket.IO events:
+ * Fourteen Socket.IO events:
  *   Client → Server: player:join, player:answer, host:advance, host:reveal, host:reset
- *   Server → Client: state:lobby, state:question, state:answerCount,
- *                    state:reveal, state:finished, state:reset, state:meta, error
+ *   Server → Client: state:lobby, state:question_preview, state:question,
+ *                    state:answerCount, state:reveal, state:finished,
+ *                    state:reset, state:meta, error
+ *
+ * Two-phase question display:
+ *   - host:advance from LOBBY/REVEALED transitions to PREVIEW (text shown,
+ *     no timer, no answers accepted). Emits state:question_preview.
+ *   - host:advance from PREVIEW transitions to ACTIVE (timer starts,
+ *     options revealed, answers accepted). Emits state:question.
+ *   - state:question_preview is role-aware: /board sees text, /host sees
+ *     text+options, /play sees ONLY the index/total (the player looks at
+ *     the projector for the question text — by design).
  *
  * Room code:
  *   - 4-digit numeric code generated once at boot (or restored from JSONL replay)
@@ -28,15 +38,14 @@
  *
  * Late-join rules:
  *   - NEW players joining when state != LOBBY → rejected with GAME_STARTED
+ *     (PREVIEW counts as past-lobby — game has effectively started)
  *   - EXISTING players (already in game.players from lobby) → allowed to rejoin
  *     from any state. They get snapped to the current state.
  *
  * Player identity:
  *   - Email is the canonical identity (lookups, idempotency, late-join check).
- *   - firstName (required) and lastName (optional) are stored alongside but
- *     are display-only — the UI shows names instead of email everywhere.
- *   - Validation accepts Unicode letters + diacritics + standard name
- *     punctuation; max 40 chars per field after trimming.
+ *   - firstName (required) and lastName (optional) stored alongside but
+ *     display-only — the UI shows names instead of email everywhere.
  *   - player:join error codes (client maps these to user-facing copy):
  *       INVALID_CODE, GAME_STARTED, EMAIL_DOMAIN,
  *       FIRST_NAME_REQUIRED, INVALID_FIRST_NAME, INVALID_LAST_NAME
@@ -61,10 +70,8 @@ const STATE_FILE = process.env.STATE_FILE || '/var/lib/quiz/state.jsonl';
 const QUIZ_FILE = process.env.QUIZ_FILE || path.join(__dirname, 'quiz.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// Throttle for state:answerCount broadcasts. 250ms = max 4 emits/sec, per spec.
 const ANSWER_COUNT_THROTTLE_MS = 250;
 
-// Fail fast if required secrets are missing — better than booting in a half-broken state.
 if (!HOST_TOKEN) {
   console.error('FATAL: HOST_TOKEN environment variable not set.');
   process.exit(1);
@@ -75,7 +82,7 @@ if (!ALLOWED_EMAIL_DOMAIN) {
 }
 
 // =====================================================================
-// QUIZ DATA (loaded once at boot from quiz.json)
+// QUIZ DATA
 // =====================================================================
 
 const quiz = JSON.parse(fs.readFileSync(QUIZ_FILE, 'utf8'));
@@ -107,22 +114,22 @@ function validateQuiz(q) {
 
 const STATE = Object.freeze({
   LOBBY: 'lobby',
-  ACTIVE: 'active',         // question shown, timer running, accepting answers
+  PREVIEW: 'preview',       // question text shown but no options/timer; awaiting host's second click
+  ACTIVE: 'active',         // question + options shown, timer running, accepting answers
   CLOSED: 'closed',         // timer expired (or early-revealed); no more answers
   REVEALED: 'revealed',     // results shown; waiting for host to advance
   FINISHED: 'finished',
 });
 
-// All mutable game state lives in this single object — easy to reason about.
 const game = {
   state: STATE.LOBBY,
-  roomCode: null,             // 4-digit string. null until ensureRoomCode() runs (boot).
-  currentIndex: -1,           // index of the current question (-1 = no question yet)
-  currentStartedAt: null,     // server timestamp (ms) when current question started
-  currentEndsAt: null,        // server timestamp (ms) when current question's timer expires
+  roomCode: null,
+  currentIndex: -1,
+  currentStartedAt: null,
+  currentEndsAt: null,
   players: new Map(),         // email -> { email, firstName, lastName, joinedAt, score, answers: Map }
   currentAnswers: new Map(),  // email -> answer record, JUST for the current question
-  closeTimer: null,           // setTimeout handle for auto-close on timer expiry
+  closeTimer: null,
 };
 
 // =====================================================================
@@ -130,25 +137,21 @@ const game = {
 // =====================================================================
 
 function generateRoomCode() {
-  // Range 1000-9999 — avoids leading-zero ambiguity when displayed.
   return String(1000 + Math.floor(Math.random() * 9000));
 }
 
 // =====================================================================
-// SCORING (deterministic — same inputs always yield same output)
+// SCORING
 // =====================================================================
 
 function calculateScore(correct, elapsedMs, durationMs) {
   if (!correct) return 0;
-  // Linear decay from 1000 (instant) down to 500 (at full duration).
-  // Spec: max(500, 1000 - floor(elapsedMs / durationMs * 500))
   const raw = 1000 - Math.floor((elapsedMs / durationMs) * 500);
   return Math.max(500, raw);
 }
 
 // =====================================================================
 // LEADERBOARD
-//   Sort by score DESC, then by email ASC for deterministic tie-breaking.
 // =====================================================================
 
 function getLeaderboard(topN) {
@@ -175,9 +178,6 @@ function getRankFor(email) {
 function applyEvent(event) {
   switch (event.type) {
     case 'join': {
-      // Players are keyed by email. Re-joining = no-op for the player record
-      // overall, but we backfill names if the existing record was created
-      // under an older schema (pre-A1) and they're rejoining with names.
       const existing = game.players.get(event.email);
       if (!existing) {
         game.players.set(event.email, {
@@ -195,19 +195,38 @@ function applyEvent(event) {
       break;
     }
 
+    case 'question_previewed': {
+      // Stage E: PREVIEW state. Question text exposed to /board and /host
+      // but timer is not running and answers are not accepted. The host
+      // clicks Advance again to transition into ACTIVE.
+      game.state = STATE.PREVIEW;
+      game.currentIndex = event.index;
+      game.currentStartedAt = null;
+      game.currentEndsAt = null;
+      game.currentAnswers = new Map();
+      break;
+    }
+
     case 'question_started': {
+      // PREVIEW → ACTIVE (or, when replaying old pre-Stage-E JSONL events,
+      // LOBBY/REVEALED → ACTIVE directly — both end in the right place
+      // because applyEvent doesn't enforce transition validity).
       game.state = STATE.ACTIVE;
+      // Old events carry index; new events also carry index for backward
+      // compat. Either way we use event.index.
       game.currentIndex = event.index;
       game.currentStartedAt = event.ts;
       game.currentEndsAt = event.ts + quiz.questions[event.index].durationMs;
+      // currentAnswers may already be empty from question_previewed; reset
+      // again here for the old-events path where preview was skipped.
       game.currentAnswers = new Map();
       break;
     }
 
     case 'answer': {
       const player = game.players.get(event.email);
-      if (!player) break;                            // unknown player — drop
-      if (player.answers.has(event.qIndex)) break;   // already answered — idempotent
+      if (!player) break;
+      if (player.answers.has(event.qIndex)) break;
 
       const q = quiz.questions[event.qIndex];
       const elapsedMs = event.ts - game.currentStartedAt;
@@ -264,17 +283,13 @@ function applyEvent(event) {
   }
 }
 
-// =====================================================================
-// RECORD-AND-PERSIST helper
-// =====================================================================
-
 function recordAndPersist(event) {
   applyEvent(event);
   persistence.append(event);
 }
 
 // =====================================================================
-// PAYLOAD BUILDERS (what we send to clients)
+// PAYLOAD BUILDERS
 // =====================================================================
 
 function buildQuestionPayload() {
@@ -288,6 +303,26 @@ function buildQuestionPayload() {
     endsAt: game.currentEndsAt,
     serverNow: Date.now(),
   };
+}
+
+// Role-aware preview payload. Players see only the question NUMBER (they
+// look at the projector for the text — by design, building tension and
+// preventing screen-glance cheating). /board sees the question text but
+// not options. /host sees both text and options so the moderator can read
+// and prep for the reveal-options click.
+function buildQuestionPreviewPayload(role) {
+  const q = quiz.questions[game.currentIndex];
+  const base = {
+    index: game.currentIndex,
+    total: quiz.questions.length,
+  };
+  if (role === 'board' || role === 'host') {
+    base.text = q.text;
+  }
+  if (role === 'host') {
+    base.options = q.options;
+  }
+  return base;
 }
 
 function buildRevealPayload() {
@@ -314,7 +349,6 @@ function buildRevealPayload() {
     distribution,
     totalAnswered,
     pctCorrect,
-    // Top 10 for /board's larger leader-side card. /host slices to 5 client-side.
     leaderboard: getLeaderboard(10),
   };
 }
@@ -355,6 +389,19 @@ function broadcastState() {
       io.emit('state:lobby', { playerCount: game.players.size });
       break;
 
+    case STATE.PREVIEW: {
+      // Role-aware emit: /board, /host, /play each get a different payload.
+      io.to('board').emit('state:question_preview', buildQuestionPreviewPayload('board'));
+      io.to('host').emit('state:question_preview', buildQuestionPreviewPayload('host'));
+      const playerPayload = buildQuestionPreviewPayload('player');
+      for (const [, sock] of io.of('/').sockets) {
+        if (sock.data.role === 'player' && sock.data.email) {
+          sock.emit('state:question_preview', playerPayload);
+        }
+      }
+      break;
+    }
+
     case STATE.ACTIVE:
     case STATE.CLOSED:
       io.emit('state:question', buildQuestionPayload());
@@ -362,7 +409,6 @@ function broadcastState() {
 
     case STATE.REVEALED: {
       const publicReveal = buildRevealPayload();
-      // Precompute the rank lookup once (the O(N²) fix from the load test).
       const sortedAll = getLeaderboard();
       const rankByEmail = new Map();
       for (let i = 0; i < sortedAll.length; i++) {
@@ -385,13 +431,14 @@ function broadcastState() {
 }
 
 function sendCurrentStateTo(socket) {
-  // Always send the room code first, before any state event. Clients (esp.
-  // /board) need it to render the lobby header regardless of game phase.
   socket.emit('state:meta', { code: game.roomCode });
 
   switch (game.state) {
     case STATE.LOBBY:
       socket.emit('state:lobby', { playerCount: game.players.size });
+      break;
+    case STATE.PREVIEW:
+      socket.emit('state:question_preview', buildQuestionPreviewPayload(socket.data.role));
       break;
     case STATE.ACTIVE:
     case STATE.CLOSED:
@@ -416,7 +463,7 @@ function sendCurrentStateTo(socket) {
 }
 
 // =====================================================================
-// THROTTLED ANSWER COUNT BROADCASTS (max 4/sec)
+// THROTTLED ANSWER COUNT BROADCASTS
 // =====================================================================
 
 let answerCountTimer = null;
@@ -434,10 +481,6 @@ function scheduleAnswerCountBroadcast() {
     }
   }, ANSWER_COUNT_THROTTLE_MS);
 }
-
-// =====================================================================
-// THROTTLED LOBBY COUNT BROADCASTS
-// =====================================================================
 
 let lobbyBroadcastTimer = null;
 
@@ -488,18 +531,33 @@ function closeCurrentQuestion() {
 // =====================================================================
 
 function hostAdvance() {
-  if (game.state !== STATE.LOBBY && game.state !== STATE.REVEALED) {
-    throw new Error(`Cannot advance from state "${game.state}"`);
-  }
-  const nextIndex = game.currentIndex + 1;
-  if (nextIndex >= quiz.questions.length) {
-    recordAndPersist({ type: 'finished', ts: Date.now() });
+  // From LOBBY or REVEALED: enter PREVIEW for the next question (or finish
+  // if no more questions remain).
+  if (game.state === STATE.LOBBY || game.state === STATE.REVEALED) {
+    const nextIndex = game.currentIndex + 1;
+    if (nextIndex >= quiz.questions.length) {
+      recordAndPersist({ type: 'finished', ts: Date.now() });
+      broadcastState();
+      return;
+    }
+    recordAndPersist({ type: 'question_previewed', ts: Date.now(), index: nextIndex });
     broadcastState();
     return;
   }
-  recordAndPersist({ type: 'question_started', ts: Date.now(), index: nextIndex });
-  scheduleAutoClose();
-  broadcastState();
+
+  // From PREVIEW: transition to ACTIVE (start timer, open answers).
+  if (game.state === STATE.PREVIEW) {
+    recordAndPersist({
+      type: 'question_started',
+      ts: Date.now(),
+      index: game.currentIndex,  // already set by question_previewed
+    });
+    scheduleAutoClose();
+    broadcastState();
+    return;
+  }
+
+  throw new Error(`Cannot advance from state "${game.state}"`);
 }
 
 function hostReveal() {
@@ -541,12 +599,10 @@ function hostReset() {
 
   recordAndPersist({ type: 'reset', ts: Date.now() });
 
-  // Rotate the room code so leaked codes don't carry over.
   const newCode = generateRoomCode();
   recordAndPersist({ type: 'room_code_set', ts: Date.now(), code: newCode });
   console.log('host:reset: new room code is', newCode);
 
-  // Clear cached identity from every connected player socket.
   for (const [, sock] of io.of('/').sockets) {
     if (sock.data.role === 'player') {
       sock.data.email = null;
@@ -592,11 +648,6 @@ const io = new Server(httpServer, {
 const escapedDomain = ALLOWED_EMAIL_DOMAIN.replace(/\./g, '\\.');
 const EMAIL_REGEX = new RegExp(`^[A-Za-z0-9._%+-]+@${escapedDomain}$`, 'i');
 
-// Names: allow letters from any script (\p{L}), combining marks for diacritics
-// (\p{M}), space, hyphen, ASCII apostrophe, curly apostrophe (U+2019), period.
-// This lets through O'Brien, García, Müller, D'Souza, St. John, Anne-Marie,
-// देवी, محمد, 王明 etc., while rejecting digits, punctuation, emoji, etc.
-// Length 1-40 chars after trimming.
 const NAME_REGEX = /^[\p{L}\p{M}\s\-'\u2019.]+$/u;
 
 function isValidName(s) {
@@ -626,8 +677,6 @@ io.on('connection', (socket) => {
     sendCurrentStateTo(socket);
   } else {
     socket.data.role = 'player';
-    // Send the room code immediately so the player UI can render header info
-    // before they bother filling out the join form.
     socket.emit('state:meta', { code: game.roomCode });
   }
 
@@ -638,22 +687,16 @@ io.on('connection', (socket) => {
       return safeAck(ack, { ok: false, error: 'Not a player socket' });
     }
 
-    // 1. Code must match the active room code.
     const submittedCode = String((payload && payload.code) || '').trim();
     if (!submittedCode || submittedCode !== game.roomCode) {
       return safeAck(ack, { ok: false, error: 'INVALID_CODE' });
     }
 
-    // 2. Email must match the allowed domain. Client renders the user-facing
-    //    copy (so corp wording can change without a server push).
     const email = String((payload && payload.email) || '').trim().toLowerCase();
     if (!EMAIL_REGEX.test(email)) {
       return safeAck(ack, { ok: false, error: 'EMAIL_DOMAIN' });
     }
 
-    // 3. Names. firstName required, lastName optional. Both subject to the
-    //    NAME_REGEX char allowlist and 40-char length cap. We trim before
-    //    validating so leading/trailing whitespace isn't a footgun.
     const firstName = String((payload && payload.firstName) || '').trim();
     const lastName = String((payload && payload.lastName) || '').trim();
 
@@ -667,26 +710,19 @@ io.on('connection', (socket) => {
       return safeAck(ack, { ok: false, error: 'INVALID_LAST_NAME' });
     }
 
-    // 4. Late-join rule: if past LOBBY, only EXISTING players are allowed
-    //    back in (network drops / refreshes / browser restarts mid-game).
-    //    Genuinely new players who didn't join during lobby are bounced.
+    // Late-join: PREVIEW counts as past-lobby. Only existing players (who
+    // joined during LOBBY) can rejoin from PREVIEW/ACTIVE/CLOSED/REVEALED.
     if (game.state !== STATE.LOBBY && !game.players.has(email)) {
       return safeAck(ack, { ok: false, error: 'GAME_STARTED' });
     }
 
     socket.data.email = email;
-    // Persist with names. applyEvent's join case is idempotent on repeat
-    // joins for the same email (and backfills names if absent on the
-    // existing record — see applyEvent for the upgrade-path logic).
     recordAndPersist({ type: 'join', ts: Date.now(), email, firstName, lastName });
 
     safeAck(ack, { ok: true });
 
-    // Snap this socket to the current game state — works for both lobby
-    // joins and mid-game rejoins.
     sendCurrentStateTo(socket);
 
-    // Refresh the lobby count for everyone (only meaningful in LOBBY state).
     if (game.state === STATE.LOBBY) {
       scheduleLobbyBroadcast();
     }
@@ -785,6 +821,8 @@ function replayFromDisk() {
     `state=${game.state}, players=${game.players.size}, currentIndex=${game.currentIndex}, ` +
     `roomCode=${game.roomCode || '(none yet)'}`);
 
+  // Resume timer if we crashed mid-ACTIVE. PREVIEW has no timer to resume —
+  // host advances manually after reboot.
   if (game.state === STATE.ACTIVE) {
     scheduleAutoClose();
   }
