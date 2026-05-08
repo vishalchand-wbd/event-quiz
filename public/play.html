@@ -78,6 +78,42 @@
     .email-form input:focus { border-color: var(--brand); }
     .email-form .err { color: var(--red); font-size: 14px; min-height: 18px; }
 
+    /* Code gate — same structural pattern as email-form, but the input is
+       monospace + center-aligned + tracking. Typing 4 numerals is a different
+       visual experience than typing an email; the input should look like a
+       PIN field, not a free-form text field. */
+    .code-form { display: flex; flex-direction: column; gap: 16px; }
+    .code-form .hint {
+      font-size: 14px; color: var(--muted);
+      text-align: center;
+      margin: 0 0 4px;
+    }
+    .code-form label {
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      text-align: center;
+    }
+    .code-form input {
+      width: 100%; padding: 18px 18px;
+      font-size: 32px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 700;
+      letter-spacing: 0.4em;
+      text-align: center;
+      border: 2px solid var(--line); border-radius: 12px;
+      background: #fff; color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .code-form input:focus { border-color: var(--brand); }
+    .code-form .err { color: var(--red); font-size: 14px; min-height: 18px; text-align: center; }
+    .code-back-btn {
+      background: none; border: none;
+      color: var(--muted); font-family: inherit; font-size: 14px;
+      text-decoration: underline; cursor: pointer;
+      padding: 8px;
+      align-self: center;
+    }
+    .code-back-btn:hover { color: var(--brand); }
+
     .btn-primary {
       width: 100%; padding: 18px;
       font-size: 17px; font-weight: 700; font-family: inherit;
@@ -144,6 +180,21 @@
     .option:disabled       { opacity: 0.5; cursor: not-allowed; }
     .option.selected       { border-color: var(--brand); background: rgba(0,100,255,0.06); }
 
+    /* Answer counter — appears below options on view-question and as a
+       secondary line on view-locked. Subtle blue tone so it doesn't compete
+       with the options/timer for attention. Tabular numerals so the count
+       doesn't shift width as it climbs (e.g. 9 → 10). */
+    .answer-counter {
+      margin-top: 16px;
+      padding: 10px 14px;
+      background: rgba(0,100,255,0.06);
+      border-radius: 10px;
+      color: var(--brand);
+      font-size: 14px; font-weight: 600;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
     /* Locked */
     .locked .icon {
       width: 56px; height: 56px; margin: 0 auto 16px;
@@ -152,7 +203,7 @@
       font-size: 28px;
     }
     .locked h2 { margin: 0 0 8px; font-size: 22px; text-align: center; }
-    .locked p  { margin: 0; text-align: center; color: var(--muted); }
+    .locked p  { margin: 0 0 16px; text-align: center; color: var(--muted); }
 
     /* Reveal */
     .reveal { text-align: center; }
@@ -238,6 +289,19 @@
       text-align: center;
     }
 
+    /* Late-join banner — same shape as reset-banner but in red. Shown when
+       the server bounces a NEW player who tried to join after the game
+       already started. */
+    .late-join-banner {
+      padding: 12px 16px; margin-bottom: 16px;
+      background: rgba(229,72,77,0.08);
+      border: 1px solid rgba(229,72,77,0.25);
+      border-radius: 12px;
+      color: var(--red);
+      font-size: 14px; font-weight: 600;
+      text-align: center;
+    }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -252,17 +316,32 @@
     <!-- 1. Email gate -->
     <section id="view-email" class="card center">
       <div id="reset-banner" class="reset-banner hidden">The game was reset by the moderator. Please rejoin.</div>
+      <div id="late-join-banner" class="late-join-banner hidden">Sorry, the game has already started. You can't join right now.</div>
       <form class="email-form" id="join-form">
         <div>
           <label for="email">Your work email</label>
           <input type="email" id="email" name="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
         </div>
         <div class="err" id="email-err"></div>
-        <button class="btn-primary" type="submit" id="join-btn">Join</button>
+        <button class="btn-primary" type="submit" id="join-btn">Continue</button>
       </form>
     </section>
 
-    <!-- 2. Lobby -->
+    <!-- 2. Code gate -->
+    <section id="view-code" class="card center hidden">
+      <form class="code-form" id="code-form">
+        <p class="hint">Find the 4-digit code on the screen at the front of the room.</p>
+        <div>
+          <label for="code">Room code</label>
+          <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required placeholder="••••">
+        </div>
+        <div class="err" id="code-err"></div>
+        <button class="btn-primary" type="submit" id="code-btn">Join</button>
+        <button type="button" class="code-back-btn" id="code-back-btn">Use a different email</button>
+      </form>
+    </section>
+
+    <!-- 3. Lobby -->
     <section id="view-lobby" class="card center hidden">
       <div class="lobby">
         <h2>You're in.</h2>
@@ -270,7 +349,7 @@
       </div>
     </section>
 
-    <!-- 3. Question -->
+    <!-- 4. Question -->
     <section id="view-question" class="card hidden">
       <div class="qheader">
         <span id="q-counter">Question 1 of 10</span>
@@ -278,18 +357,20 @@
       </div>
       <h2 class="question-text" id="q-text">…</h2>
       <div class="options" id="q-options"></div>
+      <div class="answer-counter hidden" id="q-answer-counter">0 of 0 answered</div>
     </section>
 
-    <!-- 4. Answer locked -->
+    <!-- 5. Answer locked -->
     <section id="view-locked" class="card center hidden">
       <div class="locked">
         <div class="icon">✓</div>
         <h2>Answer locked in</h2>
         <p>Waiting for the reveal…</p>
+        <div class="answer-counter hidden" id="locked-answer-counter">0 of 0 answered</div>
       </div>
     </section>
 
-    <!-- 5. Reveal -->
+    <!-- 6. Reveal -->
     <section id="view-reveal" class="card center hidden">
       <div class="reveal">
         <div class="verdict" id="r-verdict">…</div>
@@ -310,7 +391,7 @@
       </div>
     </section>
 
-    <!-- 6. Finished -->
+    <!-- 7. Finished -->
     <section id="view-finished" class="card hidden">
       <div class="finished">
         <h2>Game Over</h2>
@@ -334,6 +415,7 @@
     // ===== View management =====
     const views = {
       email:    document.getElementById('view-email'),
+      code:     document.getElementById('view-code'),
       lobby:    document.getElementById('view-lobby'),
       question: document.getElementById('view-question'),
       locked:   document.getElementById('view-locked'),
@@ -344,12 +426,70 @@
       Object.entries(views).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));
     }
 
+    // ===== State =====
+    // myEmail / myCode are set ONLY after a successful server-acknowledged join
+    // and are persisted to sessionStorage. pendingEmail / pendingCode hold
+    // values being processed across the two form views BEFORE the server
+    // has accepted them — they're not persisted.
     let myEmail = null;
+    let myCode = null;
+    let pendingEmail = null;
+    let pendingCode = null;
     let currentQIndex = -1;
     let timerInterval = null;
     let resetBannerTimer = null;
+    let lateJoinBannerTimer = null;
+
     const conn = document.getElementById('conn');
     const resetBanner = document.getElementById('reset-banner');
+    const lateJoinBanner = document.getElementById('late-join-banner');
+
+    // ===== sessionStorage helpers =====
+    // sessionStorage is per-tab — auto-clears on tab close, which is the
+    // right scope for an event session. localStorage would survive past
+    // the event into next month, leaking stale credentials.
+    const SS_EMAIL = 'quiz.email';
+    const SS_CODE  = 'quiz.code';
+
+    function saveSession(email, code) {
+      try {
+        sessionStorage.setItem(SS_EMAIL, email);
+        sessionStorage.setItem(SS_CODE, code);
+      } catch (e) { /* private mode / quota — safe to swallow */ }
+    }
+    function loadSession() {
+      try {
+        const email = sessionStorage.getItem(SS_EMAIL);
+        const code  = sessionStorage.getItem(SS_CODE);
+        if (email && code) return { email, code };
+      } catch (e) {}
+      return null;
+    }
+    function clearSession() {
+      try {
+        sessionStorage.removeItem(SS_EMAIL);
+        sessionStorage.removeItem(SS_CODE);
+      } catch (e) {}
+    }
+
+    // ===== Bootstrap: parse ?code= from URL, prime cache from sessionStorage =====
+    (function bootstrap() {
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = (params.get('code') || '').trim();
+      if (/^\d{4}$/.test(urlCode)) {
+        pendingCode = urlCode;
+      }
+      // If we have a previously-accepted session, treat the user as
+      // already-joined; the connect handler below will fire player:join
+      // automatically. If the rejoin fails (GAME_STARTED for a new email,
+      // or INVALID_CODE because the host rotated the code via reset), we
+      // bounce back to the email gate with the appropriate banner.
+      const cached = loadSession();
+      if (cached) {
+        myEmail = cached.email;
+        myCode = cached.code;
+      }
+    })();
 
     // ===== Socket.IO =====
     const socket = io({
@@ -359,15 +499,48 @@
 
     socket.on('connect', () => {
       conn.classList.remove('offline'); conn.classList.add('online');
-      // Re-join after a transport reconnect (server applyEvent is idempotent on duplicate joins).
-      // Note: after a server-initiated reset, myEmail is already null here, so we
-      // correctly DO NOT auto-rejoin — we let the user re-enter the email gate.
-      if (myEmail) socket.emit('player:join', { email: myEmail }, () => {});
+
+      // Auto-rejoin from cached session if we have one. The server's
+      // "existing players can rejoin from any state" rule handles refreshes
+      // and mid-game reconnects — we get snapped to whatever phase the
+      // game is currently in via state:meta + state:lobby/question/etc.
+      if (myEmail && myCode) {
+        socket.emit('player:join', { email: myEmail, code: myCode }, (ack) => {
+          if (!ack || !ack.ok) {
+            // Cached session is no longer valid. Drop it and bounce back to
+            // email entry with the appropriate banner.
+            const err = ack && ack.error;
+            myEmail = null;
+            myCode = null;
+            clearSession();
+            stopTimer();
+            hideAnswerCounter();
+            if (err === 'GAME_STARTED') {
+              showLateJoinBanner();
+            } else {
+              // INVALID_CODE most likely (host reset rotated the code).
+              // Either way the user has to re-enter from scratch.
+              showResetBanner();
+            }
+            showView('email');
+          }
+          // On success, the server follows up with state:meta + state:lobby
+          // (or state:question / state:reveal / etc.) — those handlers do
+          // the view transition.
+        });
+      }
     });
     socket.on('disconnect', () => {
       conn.classList.remove('online'); conn.classList.add('offline');
     });
     socket.on('error', (err) => console.error('server error:', err));
+
+    // state:meta carries the current room code. We don't use it for
+    // client-side validation (server is authoritative; the design rationale
+    // is in the handoff). Listener registered as a hook for future use.
+    socket.on('state:meta', (_meta) => {
+      // intentionally no-op
+    });
 
     // ===== Email gate =====
     const joinForm = document.getElementById('join-form');
@@ -378,31 +551,124 @@
     joinForm.addEventListener('submit', (e) => {
       e.preventDefault();
       emailErr.textContent = '';
-      // User is interacting with the form again — hide any leftover reset banner.
+      // User is interacting with the form again — hide leftover banners.
       hideResetBanner();
+      hideLateJoinBanner();
       const email = emailInput.value.trim().toLowerCase();
       if (!email || !email.includes('@')) {
         emailErr.textContent = 'Please enter a valid email.';
         return;
       }
+      pendingEmail = email;
+      // If we already have a code (from ?code= URL or a previous attempt),
+      // skip the code view entirely and submit directly. Otherwise route
+      // the user to the code gate to type it in.
+      if (pendingCode) {
+        submitJoin(pendingEmail, pendingCode);
+      } else {
+        showView('code');
+        const codeIn = document.getElementById('code');
+        codeIn.value = '';
+        document.getElementById('code-err').textContent = '';
+        // Defer focus so the view is visible first (focus on a hidden
+        // input is flaky on iOS Safari).
+        setTimeout(() => codeIn.focus(), 50);
+      }
+    });
+
+    // ===== Code gate =====
+    const codeForm = document.getElementById('code-form');
+    const codeInput = document.getElementById('code');
+    const codeBtn = document.getElementById('code-btn');
+    const codeErr = document.getElementById('code-err');
+    const codeBackBtn = document.getElementById('code-back-btn');
+
+    codeForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      codeErr.textContent = '';
+      const code = codeInput.value.trim();
+      if (!/^\d{4}$/.test(code)) {
+        codeErr.textContent = 'Enter the 4-digit code shown on the front screen.';
+        return;
+      }
+      if (!pendingEmail) {
+        // Defensive: if somehow we got here without an email (shouldn't
+        // happen via normal flow), bounce back to fix that first.
+        showView('email');
+        return;
+      }
+      pendingCode = code;
+      submitJoin(pendingEmail, pendingCode);
+    });
+
+    codeBackBtn.addEventListener('click', () => {
+      // Spec: preserve pendingCode so the user can re-edit the email and
+      // re-submit without retyping the code. Clear only the form-local error.
+      codeErr.textContent = '';
+      showView('email');
+      setTimeout(() => emailInput.focus(), 50);
+    });
+
+    // ===== Join submission =====
+    function submitJoin(email, code) {
+      // Disable both buttons while the request is in flight — the user might
+      // be on either view depending on how they got here.
       joinBtn.disabled = true;
       joinBtn.textContent = 'Joining…';
-      socket.emit('player:join', { email }, (ack) => {
+      codeBtn.disabled = true;
+      codeBtn.textContent = 'Joining…';
+
+      socket.emit('player:join', { email, code }, (ack) => {
         joinBtn.disabled = false;
-        joinBtn.textContent = 'Join';
+        joinBtn.textContent = 'Continue';
+        codeBtn.disabled = false;
+        codeBtn.textContent = 'Join';
+
         if (!ack || !ack.ok) {
-          emailErr.textContent = (ack && ack.error) || 'Could not join.';
+          const err = ack && ack.error;
+          if (err === 'INVALID_CODE') {
+            // Bad code — clear pendingCode so a stale ?code= URL value
+            // isn't reused, and ask them to re-type from the screen.
+            pendingCode = null;
+            codeErr.textContent = "That code didn't match. Check the screen and try again.";
+            showView('code');
+            setTimeout(() => { codeInput.value = ''; codeInput.focus(); }, 50);
+            return;
+          }
+          if (err === 'GAME_STARTED') {
+            // New player, late join. Wipe everything and park them on the
+            // email view with a banner. (If the host later resets, the
+            // banner auto-hides and they can try again.)
+            pendingEmail = null;
+            pendingCode = null;
+            myEmail = null;
+            myCode = null;
+            clearSession();
+            showLateJoinBanner();
+            showView('email');
+            return;
+          }
+          // Anything else (bad email format from the server's domain check,
+          // network hiccup, etc.) — show on the email form.
+          emailErr.textContent = err || 'Could not join.';
+          showView('email');
           return;
         }
+
+        // Success.
         myEmail = email;
-        // Server will follow up with state:lobby / state:question / etc.
+        myCode = code;
+        saveSession(email, code);
+        // Server follows up with state:meta + state:lobby (or whatever
+        // current state is) — those handlers do the view transition.
       });
-    });
+    }
 
     // ===== State events =====
 
     socket.on('state:lobby', () => {
       if (!myEmail) return;
+      hideAnswerCounter();
       showView('lobby');
     });
 
@@ -425,12 +691,24 @@
         optionsEl.appendChild(btn);
       });
 
+      // Reveal the answer counter on both question and locked views — server
+      // will populate it via state:answerCount immediately after.
+      showAnswerCounter();
+
       // Local timer display only — the server is authoritative on close.
-      // Adjust for clock skew so users with a wrong system clock still see ~accurate countdown.
+      // Adjust for clock skew so users with a wrong system clock still see
+      // an accurate countdown.
       const skewMs = Date.now() - q.serverNow;
       startTimer(q.endsAt + skewMs);
 
       showView('question');
+    });
+
+    socket.on('state:answerCount', (a) => {
+      if (!myEmail) return;
+      const text = `${(a.count || 0).toLocaleString()} of ${(a.total || 0).toLocaleString()} answered`;
+      document.getElementById('q-answer-counter').textContent = text;
+      document.getElementById('locked-answer-counter').textContent = text;
     });
 
     function submitAnswer(option, btnEl) {
@@ -445,16 +723,22 @@
           console.warn('answer rejected:', ack && ack.error);
           // Self-heal if the server lost our session (typically because the
           // host issued a reset between us seeing the question and answering).
-          // Bail to the email gate so the player can rejoin cleanly.
+          // Wipe sessionStorage so we don't auto-rejoin on next reconnect with
+          // stale credentials, then bail to the email gate.
           if (ack && (ack.error === 'Not joined' || ack.error === 'Unknown player')) {
             myEmail = null;
+            myCode = null;
+            clearSession();
             stopTimer();
+            hideAnswerCounter();
             showResetBanner();
             showView('email');
           }
           return;
         }
         stopTimer();
+        // Counter stays visible on the locked view — the player gets to watch
+        // others answer in real time. It's a nice "you're not alone" signal.
         showView('locked');
       });
     }
@@ -462,6 +746,7 @@
     socket.on('state:reveal', (r) => {
       if (!myEmail) return;
       stopTimer();
+      hideAnswerCounter();
 
       const yr = r.yourResult || {};
       const verdictEl     = document.getElementById('r-verdict');
@@ -492,6 +777,7 @@
     socket.on('state:finished', (f) => {
       if (!myEmail) return;
       stopTimer();
+      hideAnswerCounter();
       const podium = f.podium || [];
       const myEntry = podium.find((p) => p.email === myEmail);
       const myRank = myEntry ? podium.indexOf(myEntry) + 1 : null;
@@ -516,24 +802,35 @@
     });
 
     // ===== Reset event =====
-    // Host wiped the game from the moderator console. Drop our session and put
-    // the user back at the email gate. The server has already cleared our
-    // socket.data.email server-side, so no further server messages will arrive
-    // for us until we re-join via player:join.
+    // Host wiped the game from the moderator console. Drop our session, clear
+    // sessionStorage entirely (the room code rotated, so the cached value is
+    // useless), and put the user back at the email gate with a friendly banner.
     socket.on('state:reset', () => {
       myEmail = null;
+      myCode = null;
+      pendingEmail = null;
+      pendingCode = null;
       currentQIndex = -1;
       stopTimer();
-      // Reset the email form so the user starts clean.
+      hideAnswerCounter();
+      clearSession();
+      // Reset both forms so the user starts clean.
       emailInput.value = '';
       emailErr.textContent = '';
       joinBtn.disabled = false;
-      joinBtn.textContent = 'Join';
+      joinBtn.textContent = 'Continue';
+      codeInput.value = '';
+      codeErr.textContent = '';
+      codeBtn.disabled = false;
+      codeBtn.textContent = 'Join';
+      hideLateJoinBanner();
       showResetBanner();
       showView('email');
     });
 
+    // ===== Banner helpers =====
     function showResetBanner() {
+      hideLateJoinBanner();
       resetBanner.classList.remove('hidden');
       if (resetBannerTimer) clearTimeout(resetBannerTimer);
       // Auto-hide after 6s so the message doesn't linger forever.
@@ -542,6 +839,28 @@
     function hideResetBanner() {
       resetBanner.classList.add('hidden');
       if (resetBannerTimer) { clearTimeout(resetBannerTimer); resetBannerTimer = null; }
+    }
+    function showLateJoinBanner() {
+      hideResetBanner();
+      lateJoinBanner.classList.remove('hidden');
+      if (lateJoinBannerTimer) clearTimeout(lateJoinBannerTimer);
+      // Slightly longer than the reset banner — late-join is a denial, the
+      // user is more likely to be confused and need time to read.
+      lateJoinBannerTimer = setTimeout(() => lateJoinBanner.classList.add('hidden'), 10000);
+    }
+    function hideLateJoinBanner() {
+      lateJoinBanner.classList.add('hidden');
+      if (lateJoinBannerTimer) { clearTimeout(lateJoinBannerTimer); lateJoinBannerTimer = null; }
+    }
+
+    // ===== Answer counter helpers =====
+    function showAnswerCounter() {
+      document.getElementById('q-answer-counter').classList.remove('hidden');
+      document.getElementById('locked-answer-counter').classList.remove('hidden');
+    }
+    function hideAnswerCounter() {
+      document.getElementById('q-answer-counter').classList.add('hidden');
+      document.getElementById('locked-answer-counter').classList.add('hidden');
     }
 
     // ===== Timer helpers =====
