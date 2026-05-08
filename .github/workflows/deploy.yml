@@ -66,11 +66,17 @@ jobs:
             azureuser@quizs.live:/home/azureuser/quiz-deploy/
 
       - name: Apply staging to /opt/quiz and restart service
+        # The --exclude=node_modules is CRITICAL: without it, --delete would
+        # remove /opt/quiz/node_modules (since staging never has node_modules,
+        # only source files). The deps directory is managed separately by
+        # install.sh's npm install at provisioning time, not by this deploy.
+        # If package.json changes you need to SSH to the VM and run
+        # `cd /opt/quiz && sudo npm install --omit=dev` manually for now.
         run: |
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
               azureuser@quizs.live <<'REMOTE'
           set -e
-          sudo /usr/bin/rsync -av --delete /home/azureuser/quiz-deploy/ /opt/quiz/
+          sudo /usr/bin/rsync -av --delete --exclude=node_modules /home/azureuser/quiz-deploy/ /opt/quiz/
           sudo /usr/bin/chown -R quiz:quiz /opt/quiz
           sudo /usr/bin/systemctl restart quiz.service
           sleep 3
