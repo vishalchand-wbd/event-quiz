@@ -35,7 +35,6 @@
         var(--bg);
     }
 
-    /* Top bar */
     .topbar {
       position: absolute; top: 0; left: 0; right: 0;
       padding: 22px 36px;
@@ -54,7 +53,6 @@
       letter-spacing: 0.05em;
     }
 
-    /* Layout container — switches structure per state */
     .stage {
       position: absolute; inset: 0;
       padding: 100px 60px 60px;
@@ -106,7 +104,6 @@
     }
     .lobby .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
     .lobby .qr-wrap #qr-target { width: 100%; height: 100%; }
-    /* qrcodejs renders an <img> + a <canvas> fallback. Show the img, hide the canvas. */
     .lobby .qr-wrap #qr-target img { width: 100% !important; height: 100% !important; display: block; }
     .lobby .qr-wrap #qr-target canvas { display: none !important; }
     .lobby .qr-wrap .placeholder {
@@ -131,9 +128,6 @@
       background-clip: text;
       color: transparent;
     }
-
-    /* Room code display — sits below the URL on the left so people who can't
-       scan the QR can still type the bare URL and use this code to join. */
     .lobby .left .code-display {
       margin-top: 36px;
       display: flex; flex-direction: column; gap: 8px;
@@ -153,6 +147,38 @@
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
+    }
+
+    /* ============== PREVIEW (Stage E) ==============
+       Question text shown LARGE on the projector — no options, no timer.
+       This is the host's "read the question aloud, build tension" beat
+       before they click Reveal Options. */
+    .preview {
+      flex: 1;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      gap: 36px; padding: 40px;
+      text-align: center;
+    }
+    .preview .preview-label {
+      font-size: 18px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--brand);
+    }
+    .preview .preview-q-text {
+      margin: 0;
+      font-size: clamp(50px, 7vw, 124px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      max-width: 1400px;
+    }
+    .preview .preview-counter {
+      font-size: 16px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 12px;
+      font-variant-numeric: tabular-nums;
     }
 
     /* ============== QUESTION ============== */
@@ -273,9 +299,6 @@
       border: 1px solid var(--line);
       border-radius: 24px;
       padding: 32px;
-      /* Defensive overflow — top 10 rows fit comfortably in the design budget
-         but if a smaller projector ever runs short we'd rather scroll than
-         visually clip the bottom rows. */
       overflow-y: auto;
     }
     .reveal .leader-side h3 {
@@ -284,8 +307,6 @@
       text-transform: uppercase; letter-spacing: 0.12em;
       color: var(--muted);
     }
-    /* Row spacing trimmed from R2 (14px / 8px) so 10 rows fit on a 1080p
-       projector with breathing room. Visual rhythm preserved. */
     .reveal .leader-row {
       display: flex; align-items: center; gap: 18px;
       padding: 10px 16px;
@@ -304,8 +325,6 @@
       font-size: clamp(16px, 1.4vw, 22px);
       font-weight: 700;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      /* Smooth filter transition so when Stage D removes the .blurred class
-         (on host:revealPodium), the unblur animates rather than jump-cuts. */
       transition: filter 600ms ease-out;
     }
     .reveal .leader-row .pts {
@@ -314,14 +333,10 @@
       font-size: clamp(18px, 1.5vw, 26px);
       color: var(--brand);
     }
-    /* Top 3 — names blurred to build tension. The position number and score
-       stay sharp, so the audience can see WHERE the leaders are without
-       knowing WHO they are. The reveal happens in Stage D (podium reveal). */
     .reveal .leader-row.blurred .name {
       filter: blur(10px);
       user-select: none;
     }
-    /* Empty-state placeholder for the leader-side card. */
     .reveal .leader-side .empty {
       padding: 24px 16px;
       color: var(--muted); font-style: italic;
@@ -393,7 +408,6 @@
     .finished .also-rans .row .pts {
       font-variant-numeric: tabular-nums; font-weight: 800; color: var(--brand);
     }
-    /* Empty-state placeholder for the podium when nobody played. Defensive. */
     .finished .empty {
       padding: 36px 0;
       color: var(--muted); font-style: italic;
@@ -433,6 +447,15 @@
           <div class="num" id="lobby-count">0</div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ============== PREVIEW (Stage E) ============== -->
+  <div class="stage hidden" id="stage-preview">
+    <div class="preview">
+      <div class="preview-label">Get ready</div>
+      <h2 class="preview-q-text" id="p-q-text">…</h2>
+      <div class="preview-counter" id="p-q-counter">Question 1 of 10</div>
     </div>
   </div>
 
@@ -490,9 +513,9 @@
   <script>
     'use strict';
 
-    // ===== Stage management =====
     const stages = {
       lobby:    document.getElementById('stage-lobby'),
+      preview:  document.getElementById('stage-preview'),
       question: document.getElementById('stage-question'),
       reveal:   document.getElementById('stage-reveal'),
       finished: document.getElementById('stage-finished'),
@@ -501,10 +524,6 @@
       Object.entries(stages).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));
     }
 
-    // displayName(p) — render the player's name from the server payload.
-    // Falls back to "—" if name fields are absent. Server validates firstName
-    // as required on join (A1), so this fallback is purely defensive.
-    // We deliberately do NOT fall back to email — names-only per spec.
     function displayName(p) {
       if (!p) return '—';
       const first = (p.firstName || '').trim();
@@ -513,68 +532,55 @@
       return full || '—';
     }
 
-    // Render the join URL using the actual current host (so renaming the domain doesn't break this).
     const playUrl = `${location.origin}/play`;
     document.getElementById('join-url').textContent = playUrl;
 
-    // QR rendering is wrapped so we can re-render when the room code changes.
-    // The QR encodes the URL WITH the code as a query param (?code=XXXX) so
-    // phone scanners auto-fill the code-entry step on /play. People who can't
-    // scan can still type the bare URL and use the room code shown next to it.
     const roomCodeEl = document.getElementById('room-code');
     let qrCodeRendered = false;
 
     function renderQRCode(targetUrl) {
       const target = document.getElementById('qr-target');
-      target.innerHTML = '';     // clear any prior render so we don't stack instances
+      target.innerHTML = '';
       if (window.QRCode) {
         new QRCode(target, {
           text: targetUrl,
-          width: 480,                          // high-res so it stays sharp on big screens
+          width: 480,
           height: 480,
-          colorDark:  '#000000',               // black-on-white for max scanner reliability
+          colorDark:  '#000000',
           colorLight: '#ffffff',
-          correctLevel: QRCode.CorrectLevel.M, // 15% recovery — fine for projector use
+          correctLevel: QRCode.CorrectLevel.M,
         });
         qrCodeRendered = true;
       } else if (!qrCodeRendered) {
-        // QRCode library failed to load (corp firewall? cdnjs down?).
-        // Show the URL as plain text inside the QR card so people can still join.
         const wrap = document.querySelector('.qr-wrap');
         wrap.innerHTML = `<div class="placeholder">QR unavailable. Visit:<br><br><strong>${targetUrl}</strong></div>`;
       }
     }
 
-    // Render immediately with the bare URL as a defensive fallback. The server
-    // will follow up with state:meta containing the actual code, at which point
-    // we re-render with the code embedded. The initial flash is barely visible
-    // because state:meta is the first message after the WebSocket handshake.
     renderQRCode(playUrl);
 
-    // ===== Live answer count tween =====
-    // The server emits state:answerCount up to 4× per second. Between emits we
-    // tween the number visually so it always looks "alive" rather than stutter-stepping.
     const ansCountEl = document.getElementById('ans-count');
     const ansTotalEl = document.getElementById('ans-total');
     let displayedCount = 0;
     let targetCount    = 0;
     function tweenAnswerCount() {
       if (displayedCount === targetCount) return;
-      // Ease toward the target — close 30% of the gap each frame.
       const next = displayedCount + (targetCount - displayedCount) * 0.3;
-      // Snap when we're within 0.5 of the target so we don't asymptote forever.
       displayedCount = Math.abs(next - targetCount) < 0.5 ? targetCount : next;
       ansCountEl.textContent = Math.round(displayedCount).toLocaleString();
     }
-    setInterval(tweenAnswerCount, 33);  // ~30fps is plenty for a counter
+    setInterval(tweenAnswerCount, 33);
 
-    // ===== Socket =====
+    let revealChart = null;
+    function destroyRevealChart() {
+      if (revealChart) {
+        revealChart.destroy();
+        revealChart = null;
+      }
+    }
+
     const socket = io({ transports: ['websocket'], auth: { role: 'board' } });
 
-    // state:meta carries the active room code. The server sends it on connect
-    // and rebroadcasts it after host:reset (which rotates the code). When it
-    // arrives, update the displayed code and re-render the QR so it encodes
-    // the code as a query param (saves phone users a tap).
     socket.on('state:meta', (m) => {
       if (!m || !m.code) return;
       roomCodeEl.textContent = m.code;
@@ -582,12 +588,37 @@
     });
 
     socket.on('state:lobby', (p) => {
+      stopTimer();
+      destroyRevealChart();
       document.getElementById('lobby-count').textContent = (p.playerCount || 0).toLocaleString();
       document.getElementById('topmeta').textContent = '';
       showStage('lobby');
     });
 
+    // Stage E: question_preview phase. Show the question text large with no
+    // options visible. Clean up any leftover chart from the previous reveal
+    // so the chart object doesn't dangle in memory.
+    socket.on('state:question_preview', (q) => {
+      stopTimer();
+      destroyRevealChart();
+      // Reset answer-count tween for the upcoming question.
+      displayedCount = 0;
+      targetCount = 0;
+      ansCountEl.textContent = '0';
+      ansTotalEl.textContent = '0';
+
+      document.getElementById('p-q-text').textContent = q.text || '…';
+      const num = (q.index || 0) + 1;
+      const total = q.total || 0;
+      document.getElementById('p-q-counter').textContent =
+        total ? `Question ${num} of ${total}` : `Question ${num}`;
+      document.getElementById('topmeta').textContent =
+        total ? `${num} / ${total}` : `${num}`;
+      showStage('preview');
+    });
+
     socket.on('state:question', (q) => {
+      destroyRevealChart();
       document.getElementById('q-counter').textContent = `Question ${q.index + 1} of ${q.total}`;
       document.getElementById('q-text').textContent = q.text;
       const optsEl = document.getElementById('q-opts');
@@ -600,12 +631,10 @@
         optsEl.appendChild(div);
       });
 
-      // Reset counter for the new question.
       displayedCount = 0;
       targetCount = 0;
       ansCountEl.textContent = '0';
 
-      // Local timer.
       const skewMs = Date.now() - q.serverNow;
       startTimer(q.endsAt + skewMs);
 
@@ -618,15 +647,11 @@
       ansTotalEl.textContent = (a.total || 0).toLocaleString();
     });
 
-    let revealChart = null;
     socket.on('state:reveal', (r) => {
       stopTimer();
       document.getElementById('r-q-text').textContent = r.questionText || '';
       document.getElementById('r-pct').textContent = (r.pctCorrect || 0);
 
-      // Bar chart — correct option in green, all incorrect in red. The shift
-      // from blue→red on incorrect makes the right answer pop more clearly
-      // and matches the player's per-question reveal coloring.
       const styles = getComputedStyle(document.documentElement);
       const greenColor = styles.getPropertyValue('--green').trim() || '#22C58A';
       const redColor   = styles.getPropertyValue('--red').trim()   || '#E5484D';
@@ -634,7 +659,7 @@
       const labels = letters.map((L, i) => `${L}. ${(r.options && r.options[i]) || ''}`);
       const colors = labels.map((_, i) => i === r.correctOption ? greenColor : redColor);
 
-      if (revealChart) revealChart.destroy();
+      destroyRevealChart();
       const ctx = document.getElementById('reveal-chart').getContext('2d');
       revealChart = new Chart(ctx, {
         type: 'bar',
@@ -673,9 +698,6 @@
         },
       });
 
-      // Top 10 leaderboard with positions 1–3 blurred. The "no padding" rule
-      // (slice + forEach) renders exactly as many rows as there are players;
-      // empty state shown only if the leaderboard is genuinely empty.
       const lb = r.leaderboard || [];
       const lbEl = document.getElementById('leader-rows');
       lbEl.innerHTML = '';
@@ -688,9 +710,6 @@
       } else {
         list.forEach((p, i) => {
           const row = document.createElement('div');
-          // Blur first 3 names regardless of how many players are on the
-          // board — with only 1 player they're rank 1 and blurred; same
-          // rule applies all the way up. Names are sharp from rank 4 onward.
           row.className = 'leader-row' + (i < 3 ? ' blurred' : '');
           row.innerHTML =
             `<span class="pos">${i + 1}</span>` +
@@ -705,6 +724,7 @@
 
     socket.on('state:finished', (f) => {
       stopTimer();
+      destroyRevealChart();
       const podium = (f.podium || []).slice(0, 5);
 
       const podiumEl = document.getElementById('podium');
@@ -713,8 +733,6 @@
       alsoEl.innerHTML = '';
 
       if (podium.length === 0) {
-        // Defensive empty state — shouldn't normally happen, but if the
-        // game finishes with zero scoring players don't render an empty card.
         const empty = document.createElement('div');
         empty.className = 'empty';
         empty.textContent = 'No players to show.';
@@ -722,9 +740,6 @@
       } else {
         const medals = ['🥇', '🥈', '🥉'];
         const classes = ['gold', 'silver', 'bronze'];
-        // Visual order: silver, gold, bronze (gold in the middle, taller).
-        // The if-skip on missing entries naturally handles fewer-than-3 cases:
-        // 1 player → only gold pillar; 2 players → gold + silver; etc.
         const visualOrder = [1, 0, 2];
         visualOrder.forEach((rank) => {
           const p = podium[rank];
@@ -738,7 +753,6 @@
           podiumEl.appendChild(div);
         });
 
-        // Ranks 4 and 5 (also-rans). slice(3) is empty when podium has ≤3.
         podium.slice(3).forEach((p, i) => {
           const row = document.createElement('div');
           row.className = 'row';
@@ -754,23 +768,15 @@
       showStage('finished');
     });
 
-    // ===== Reset event =====
-    // Host wiped the game from the moderator console. Tear down chart state and
-    // reset the answer-count tween. The follow-up state:lobby broadcast switches
-    // the visible stage back to the lobby/QR display.
     socket.on('state:reset', () => {
       stopTimer();
-      if (revealChart) {
-        revealChart.destroy();
-        revealChart = null;
-      }
+      destroyRevealChart();
       displayedCount = 0;
       targetCount = 0;
       ansCountEl.textContent = '0';
       ansTotalEl.textContent = '0';
     });
 
-    // ===== Timer =====
     let timerInterval = null;
     function startTimer(endsAtLocalMs) {
       stopTimer();
