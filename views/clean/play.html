@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0064FF">
+  <title>Quiz</title>
+  <!-- favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #0064FF;
+      --brand-dark: #0050D0;
+      --bg: #ffffff;
+      --surface: #F5F7FB;
+      --text: #0E1A2B;
+      --muted: #6B7280;
+      --line: #E5E7EB;
+      --green: #15B886;
+      --red: #E5484D;
+      --shadow: 0 1px 2px rgba(14, 26, 43, 0.04), 0 4px 16px rgba(14, 26, 43, 0.06);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+      font-size: 17px;
+      line-height: 1.5;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+    }
+    body { min-height: 100dvh; display: flex; flex-direction: column; }
+
+    header {
+      background: var(--brand); color: #fff;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    header .logo { height: 28px; width: auto; filter: brightness(0) invert(1); }
+    header h1 {
+      margin: 0; font-size: 16px; font-weight: 700;
+      letter-spacing: 0.02em; text-transform: uppercase;
+    }
+    header .conn {
+      margin-left: auto; width: 8px; height: 8px;
+      border-radius: 50%; background: rgba(255,255,255,0.4);
+      transition: background 0.2s;
+    }
+    header .conn.online  { background: #4ADE80; box-shadow: 0 0 6px #4ADE80; }
+    header .conn.offline { background: #FCA5A5; }
+
+    main { flex: 1; padding: 20px 16px 32px; display: flex; flex-direction: column; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 24px 20px;
+      box-shadow: var(--shadow);
+    }
+    .center { display: flex; flex-direction: column; justify-content: center; flex: 1; }
+
+    /* Identity gate */
+    .email-form { display: flex; flex-direction: column; gap: 16px; }
+    .email-form label {
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      display: block; margin-bottom: 6px;
+    }
+    .email-form .row-2 {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    .email-form input {
+      width: 100%; padding: 14px 16px;
+      font-size: 17px; font-family: inherit;
+      border: 2px solid var(--line); border-radius: 12px;
+      background: #fff; color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .email-form input:focus { border-color: var(--brand); }
+    .email-form .err { color: var(--red); font-size: 14px; min-height: 18px; }
+    .email-form .field-hint {
+      font-size: 12px; color: var(--muted);
+      margin-top: 4px;
+    }
+    .email-form .label-optional {
+      text-transform: none; font-weight: 500; color: var(--muted);
+    }
+
+    /* Code gate */
+    .code-form { display: flex; flex-direction: column; gap: 16px; }
+    .code-form .hint {
+      font-size: 14px; color: var(--muted);
+      text-align: center;
+      margin: 0 0 4px;
+    }
+    .code-form label {
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      text-align: center;
+    }
+    .code-form input {
+      width: 100%; padding: 18px 18px;
+      font-size: 32px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 700;
+      letter-spacing: 0.4em;
+      text-align: center;
+      border: 2px solid var(--line); border-radius: 12px;
+      background: #fff; color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .code-form input:focus { border-color: var(--brand); }
+    .code-form .err { color: var(--red); font-size: 14px; min-height: 18px; text-align: center; }
+    .code-back-btn {
+      background: none; border: none;
+      color: var(--muted); font-family: inherit; font-size: 14px;
+      text-decoration: underline; cursor: pointer;
+      padding: 8px;
+      align-self: center;
+    }
+    .code-back-btn:hover { color: var(--brand); }
+
+    .btn-primary {
+      width: 100%; padding: 18px;
+      font-size: 17px; font-weight: 700; font-family: inherit;
+      background: var(--brand); color: #fff;
+      border: none; border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+    .btn-primary:active   { transform: scale(0.98); background: var(--brand-dark); }
+    .btn-primary:disabled { background: #B0BCCC; cursor: not-allowed; }
+
+    /* Lobby */
+    .lobby h2 { margin: 0 0 6px; font-size: 24px; font-weight: 800; }
+    .lobby p { margin: 0 0 20px; color: var(--muted); }
+    .lobby .pulse {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; background: var(--brand);
+      margin-right: 8px;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50%      { opacity: 1;   transform: scale(1.1); }
+    }
+
+    /* Preview — player sees only the question NUMBER, not the text. They
+       look at the projector for the actual question content. This builds
+       tension for the moderator's "Reveal Options" click and (deliberately)
+       prevents glance-cheating where someone races to read the question
+       text on their phone before the host is ready. */
+    .preview-state { text-align: center; padding: 16px 0; }
+    .preview-state .preview-label {
+      font-size: 13px; font-weight: 700; color: var(--brand);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+    .preview-state .preview-q-num {
+      font-size: 44px; font-weight: 800; margin: 0 0 16px; line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .preview-state .preview-q-num .of {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.65em;
+    }
+    .preview-state .preview-hint { color: var(--muted); margin: 0; font-size: 15px; }
+
+    /* Question */
+    .qheader {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 14px;
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .timer {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      background: var(--brand); color: #fff;
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer.warn { background: var(--red); }
+    .question-text {
+      font-size: 22px; font-weight: 700; line-height: 1.3;
+      margin: 0 0 24px;
+    }
+    .options { display: flex; flex-direction: column; gap: 12px; }
+    .option {
+      width: 100%; padding: 18px 18px;
+      font-size: 17px; font-weight: 600; font-family: inherit;
+      text-align: left;
+      background: #fff; color: var(--text);
+      border: 2px solid var(--line); border-radius: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 14px;
+      transition: border-color 0.15s, background 0.15s, transform 0.05s;
+    }
+    .option:active { transform: scale(0.98); }
+    .option:hover  { border-color: var(--brand); }
+    .option .letter {
+      flex: 0 0 32px; height: 32px; border-radius: 50%;
+      background: var(--brand); color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 14px;
+    }
+    .option:disabled       { opacity: 0.5; cursor: not-allowed; }
+    .option.selected       { border-color: var(--brand); background: rgba(0,100,255,0.06); }
+
+    /* Answer counter */
+    .answer-counter {
+      margin-top: 16px;
+      padding: 10px 14px;
+      background: rgba(0,100,255,0.06);
+      border-radius: 10px;
+      color: var(--brand);
+      font-size: 14px; font-weight: 600;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Locked (covers both "answer locked" and "time's up" sub-states) */
+    .locked .icon {
+      width: 56px; height: 56px; margin: 0 auto 16px;
+      border-radius: 50%; background: var(--brand); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+    }
+    .locked .icon.timeup { background: var(--red); }
+    .locked h2 { margin: 0 0 8px; font-size: 22px; text-align: center; }
+    .locked p  { margin: 0 0 16px; text-align: center; color: var(--muted); }
+
+    /* Reveal */
+    .reveal-q-meta {
+      font-size: 12px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .reveal-q-text {
+      font-size: 18px; font-weight: 700; line-height: 1.35;
+      margin: 0 0 18px;
+    }
+    .reveal .verdict {
+      font-size: 26px; font-weight: 800;
+      margin: 0;
+      text-align: center;
+    }
+    .reveal .verdict.correct { color: var(--green); }
+    .reveal .verdict.wrong   { color: var(--red); }
+    .reveal .verdict.timeup  { color: var(--muted); }
+    .reveal .points {
+      font-size: 44px; font-weight: 800;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+      margin: 4px 0 22px;
+      text-align: center;
+    }
+    .reveal .points.zero { color: var(--muted); }
+
+    .option-result {
+      width: 100%; padding: 14px 16px;
+      font-size: 16px; font-weight: 600;
+      background: #fff; color: var(--text);
+      border: 2px solid var(--line); border-radius: 14px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .option-result .letter {
+      flex: 0 0 30px; height: 30px; border-radius: 50%;
+      background: var(--surface); color: var(--text);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+    }
+    .option-result .text { flex: 1; }
+    .option-result .mark {
+      flex: 0 0 28px; height: 28px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 16px; color: #fff;
+      line-height: 1;
+    }
+    .option-result.correct {
+      border-color: var(--green);
+      background: rgba(21, 184, 134, 0.06);
+    }
+    .option-result.correct .letter { background: var(--green); color: #fff; }
+    .option-result.correct .mark   { background: var(--green); }
+    .option-result.wrong-pick {
+      border-color: var(--red);
+      background: rgba(229, 72, 77, 0.06);
+    }
+    .option-result.wrong-pick .letter { background: var(--red); color: #fff; }
+    .option-result.wrong-pick .mark   { background: var(--red); }
+
+    /* Finished */
+    .thanks { text-align: center; }
+    .thanks-icon { font-size: 64px; line-height: 1; margin-bottom: 16px; }
+    .thanks h2 { font-size: 28px; font-weight: 800; margin: 0 0 12px; }
+    .thanks p  { color: var(--muted); margin: 0; }
+
+    /* Banners */
+    .reset-banner {
+      padding: 12px 16px; margin-bottom: 16px;
+      background: rgba(0,100,255,0.08);
+      border: 1px solid rgba(0,100,255,0.2);
+      border-radius: 12px;
+      color: var(--brand);
+      font-size: 14px; font-weight: 600;
+      text-align: center;
+    }
+    .late-join-banner {
+      padding: 12px 16px; margin-bottom: 16px;
+      background: rgba(229,72,77,0.08);
+      border: 1px solid rgba(229,72,77,0.25);
+      border-radius: 12px;
+      color: var(--red);
+      font-size: 14px; font-weight: 600;
+      text-align: center;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="/logo.png" alt="" class="logo" onerror="this.style.display='none'">
+    <h1>Live Quiz</h1>
+    <span class="conn offline" id="conn" title="Connection status"></span>
+  </header>
+
+  <main>
+    <!-- 1. Identity gate -->
+    <section id="view-email" class="card center">
+      <div id="reset-banner" class="reset-banner hidden">The game was reset by the moderator. Please rejoin.</div>
+      <div id="late-join-banner" class="late-join-banner hidden">Sorry, the game has already started. You can't join right now.</div>
+      <form class="email-form" id="join-form">
+        <div class="row-2">
+          <div>
+            <label for="first-name">First name</label>
+            <input type="text" id="first-name" name="first-name" autocomplete="given-name" maxlength="40" required placeholder="First">
+          </div>
+          <div>
+            <label for="last-name">Last name <span class="label-optional">(optional)</span></label>
+            <input type="text" id="last-name" name="last-name" autocomplete="family-name" maxlength="40" placeholder="Last">
+          </div>
+        </div>
+        <div>
+          <label for="email">Work email</label>
+          <input type="email" id="email" name="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
+          <div class="field-hint">Used to identify winners and contact you about prizes.</div>
+        </div>
+        <div class="err" id="email-err"></div>
+        <button class="btn-primary" type="submit" id="join-btn">Continue</button>
+      </form>
+    </section>
+
+    <!-- 2. Code gate -->
+    <section id="view-code" class="card center hidden">
+      <form class="code-form" id="code-form">
+        <p class="hint">Find the 4-digit code on the screen at the front of the room.</p>
+        <div>
+          <label for="code">Room code</label>
+          <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required placeholder="••••">
+        </div>
+        <div class="err" id="code-err"></div>
+        <button class="btn-primary" type="submit" id="code-btn">Join</button>
+        <button type="button" class="code-back-btn" id="code-back-btn">Use different details</button>
+      </form>
+    </section>
+
+    <!-- 3. Lobby -->
+    <section id="view-lobby" class="card center hidden">
+      <div class="lobby">
+        <h2 id="lobby-greeting">You're in.</h2>
+        <p><span class="pulse"></span>Waiting for the moderator to start...</p>
+      </div>
+    </section>
+
+    <!-- 4. Preview — host has shown the question on the projector but
+         hasn't revealed options/timer yet. Player sees the number only. -->
+    <section id="view-preview" class="card center hidden">
+      <div class="preview-state">
+        <div class="preview-label">Get ready</div>
+        <div class="preview-q-num"><span id="p-q-num-current">Question 1</span> <span class="of" id="p-q-num-of">of 10</span></div>
+        <p class="preview-hint">Look at the screen at the front of the room.</p>
+      </div>
+    </section>
+
+    <!-- 5. Question (active) -->
+    <section id="view-question" class="card hidden">
+      <div class="qheader">
+        <span id="q-counter">Question 1 of 10</span>
+        <span class="timer" id="q-timer">--</span>
+      </div>
+      <h2 class="question-text" id="q-text">…</h2>
+      <div class="options" id="q-options"></div>
+      <div class="answer-counter hidden" id="q-answer-counter">0 of 0 answered</div>
+    </section>
+
+    <!-- 6. Locked / Time's up -->
+    <section id="view-locked" class="card center hidden">
+      <div class="locked">
+        <div class="icon" id="locked-icon">✓</div>
+        <h2 id="locked-title">Answer locked in</h2>
+        <p id="locked-subtitle">Waiting for the reveal…</p>
+        <div class="answer-counter hidden" id="locked-answer-counter">0 of 0 answered</div>
+      </div>
+    </section>
+
+    <!-- 7. Reveal -->
+    <section id="view-reveal" class="card hidden">
+      <div class="reveal">
+        <div class="reveal-q-meta" id="r-q-meta">Question 1 of 10</div>
+        <h3 class="reveal-q-text" id="r-q-text">…</h3>
+        <div class="verdict" id="r-verdict">…</div>
+        <div class="points" id="r-points">+0</div>
+        <div class="options" id="r-options"></div>
+      </div>
+    </section>
+
+    <!-- 8. Finished -->
+    <section id="view-finished" class="card center hidden">
+      <div class="thanks">
+        <div class="thanks-icon">🎉</div>
+        <h2>Thanks for playing!</h2>
+        <p>Watch the screen at the front of the room for the final results.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    'use strict';
+
+    // ===== View management =====
+    const views = {
+      email:    document.getElementById('view-email'),
+      code:     document.getElementById('view-code'),
+      lobby:    document.getElementById('view-lobby'),
+      preview:  document.getElementById('view-preview'),
+      question: document.getElementById('view-question'),
+      locked:   document.getElementById('view-locked'),
+      reveal:   document.getElementById('view-reveal'),
+      finished: document.getElementById('view-finished'),
+    };
+    function showView(name) {
+      Object.entries(views).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));
+    }
+
+    // ===== State =====
+    let myEmail = null;
+    let myFirstName = null;
+    let myLastName = null;
+    let myCode = null;
+    let pendingEmail = null;
+    let pendingFirstName = null;
+    let pendingLastName = null;
+    let pendingCode = null;
+
+    let currentQIndex = -1;
+    let currentAnswered = false;
+    let timerInterval = null;
+    let resetBannerTimer = null;
+    let lateJoinBannerTimer = null;
+
+    const conn = document.getElementById('conn');
+    const resetBanner = document.getElementById('reset-banner');
+    const lateJoinBanner = document.getElementById('late-join-banner');
+
+    // ===== Client-side name validation =====
+    const NAME_REGEX = /^[\p{L}\p{M}\s\-'\u2019.]+$/u;
+    function isValidName(s) {
+      return typeof s === 'string' && s.length >= 1 && s.length <= 40 && NAME_REGEX.test(s);
+    }
+
+    function errorMessage(code) {
+      switch (code) {
+        case 'EMAIL_DOMAIN':
+          return 'Please use your WBD work email — we use it to identify you and reach out if you win a prize.';
+        case 'FIRST_NAME_REQUIRED':
+          return 'Please enter your first name.';
+        case 'INVALID_FIRST_NAME':
+          return 'First name can only contain letters, spaces, hyphens, or apostrophes (up to 40 characters).';
+        case 'INVALID_LAST_NAME':
+          return 'Last name can only contain letters, spaces, hyphens, or apostrophes (up to 40 characters).';
+        case 'INVALID_CODE':
+          return "That code didn't match. Check the screen and try again.";
+        case 'GAME_STARTED':
+          return "Sorry, the game has already started. You can't join right now.";
+        default:
+          return code || 'Could not join.';
+      }
+    }
+
+    // ===== sessionStorage helpers =====
+    const SS_EMAIL      = 'quiz.email';
+    const SS_FIRST_NAME = 'quiz.firstName';
+    const SS_LAST_NAME  = 'quiz.lastName';
+    const SS_CODE       = 'quiz.code';
+
+    function saveSession(email, code, firstName, lastName) {
+      try {
+        sessionStorage.setItem(SS_EMAIL, email);
+        sessionStorage.setItem(SS_CODE, code);
+        sessionStorage.setItem(SS_FIRST_NAME, firstName);
+        sessionStorage.setItem(SS_LAST_NAME, lastName || '');
+      } catch (e) {}
+    }
+    function loadSession() {
+      try {
+        const email     = sessionStorage.getItem(SS_EMAIL);
+        const code      = sessionStorage.getItem(SS_CODE);
+        const firstName = sessionStorage.getItem(SS_FIRST_NAME);
+        const lastName  = sessionStorage.getItem(SS_LAST_NAME) || '';
+        if (email && code && firstName) return { email, code, firstName, lastName };
+      } catch (e) {}
+      return null;
+    }
+    function clearSession() {
+      try {
+        sessionStorage.removeItem(SS_EMAIL);
+        sessionStorage.removeItem(SS_CODE);
+        sessionStorage.removeItem(SS_FIRST_NAME);
+        sessionStorage.removeItem(SS_LAST_NAME);
+      } catch (e) {}
+    }
+
+    // ===== Bootstrap =====
+    (function bootstrap() {
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = (params.get('code') || '').trim();
+      if (/^\d{4}$/.test(urlCode)) {
+        pendingCode = urlCode;
+      }
+      const cached = loadSession();
+      if (cached) {
+        myEmail = cached.email;
+        myCode = cached.code;
+        myFirstName = cached.firstName;
+        myLastName = cached.lastName;
+      }
+    })();
+
+    // ===== Socket.IO =====
+    const socket = io({
+      transports: ['websocket'],
+      auth: { role: 'player' },
+    });
+
+    socket.on('connect', () => {
+      conn.classList.remove('offline'); conn.classList.add('online');
+      if (myEmail && myCode && myFirstName) {
+        socket.emit('player:join', {
+          email: myEmail,
+          code: myCode,
+          firstName: myFirstName,
+          lastName: myLastName || '',
+        }, (ack) => {
+          if (!ack || !ack.ok) {
+            const err = ack && ack.error;
+            myEmail = null; myCode = null;
+            myFirstName = null; myLastName = null;
+            clearSession();
+            stopTimer();
+            hideAnswerCounter();
+            if (err === 'GAME_STARTED') {
+              showLateJoinBanner();
+            } else {
+              showResetBanner();
+            }
+            showView('email');
+          }
+        });
+      }
+    });
+    socket.on('disconnect', () => {
+      conn.classList.remove('online'); conn.classList.add('offline');
+    });
+    socket.on('error', (err) => console.error('server error:', err));
+
+    socket.on('state:meta', (_meta) => { /* no-op; hook for future use */ });
+
+    // ===== Identity gate =====
+    const joinForm = document.getElementById('join-form');
+    const firstNameInput = document.getElementById('first-name');
+    const lastNameInput = document.getElementById('last-name');
+    const emailInput = document.getElementById('email');
+    const joinBtn = document.getElementById('join-btn');
+    const emailErr = document.getElementById('email-err');
+
+    joinForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      emailErr.textContent = '';
+      hideResetBanner();
+      hideLateJoinBanner();
+
+      const firstName = firstNameInput.value.trim();
+      const lastName = lastNameInput.value.trim();
+      const email = emailInput.value.trim().toLowerCase();
+
+      if (!firstName) {
+        emailErr.textContent = errorMessage('FIRST_NAME_REQUIRED');
+        firstNameInput.focus();
+        return;
+      }
+      if (!isValidName(firstName)) {
+        emailErr.textContent = errorMessage('INVALID_FIRST_NAME');
+        firstNameInput.focus();
+        return;
+      }
+      if (lastName && !isValidName(lastName)) {
+        emailErr.textContent = errorMessage('INVALID_LAST_NAME');
+        lastNameInput.focus();
+        return;
+      }
+      if (!email || !email.includes('@')) {
+        emailErr.textContent = 'Please enter a valid email address.';
+        emailInput.focus();
+        return;
+      }
+
+      pendingFirstName = firstName;
+      pendingLastName = lastName;
+      pendingEmail = email;
+
+      if (pendingCode) {
+        submitJoin(pendingEmail, pendingCode, pendingFirstName, pendingLastName);
+      } else {
+        showView('code');
+        const codeIn = document.getElementById('code');
+        codeIn.value = '';
+        document.getElementById('code-err').textContent = '';
+        setTimeout(() => codeIn.focus(), 50);
+      }
+    });
+
+    // ===== Code gate =====
+    const codeForm = document.getElementById('code-form');
+    const codeInput = document.getElementById('code');
+    const codeBtn = document.getElementById('code-btn');
+    const codeErr = document.getElementById('code-err');
+    const codeBackBtn = document.getElementById('code-back-btn');
+
+    codeForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      codeErr.textContent = '';
+      const code = codeInput.value.trim();
+      if (!/^\d{4}$/.test(code)) {
+        codeErr.textContent = 'Enter the 4-digit code shown on the front screen.';
+        return;
+      }
+      if (!pendingEmail || !pendingFirstName) {
+        showView('email');
+        return;
+      }
+      pendingCode = code;
+      submitJoin(pendingEmail, pendingCode, pendingFirstName, pendingLastName);
+    });
+
+    codeBackBtn.addEventListener('click', () => {
+      codeErr.textContent = '';
+      showView('email');
+      setTimeout(() => firstNameInput.focus(), 50);
+    });
+
+    function submitJoin(email, code, firstName, lastName) {
+      joinBtn.disabled = true;
+      joinBtn.textContent = 'Joining…';
+      codeBtn.disabled = true;
+      codeBtn.textContent = 'Joining…';
+
+      socket.emit('player:join', { email, code, firstName, lastName: lastName || '' }, (ack) => {
+        joinBtn.disabled = false;
+        joinBtn.textContent = 'Continue';
+        codeBtn.disabled = false;
+        codeBtn.textContent = 'Join';
+
+        if (!ack || !ack.ok) {
+          const err = ack && ack.error;
+          if (err === 'INVALID_CODE') {
+            pendingCode = null;
+            codeErr.textContent = errorMessage('INVALID_CODE');
+            showView('code');
+            setTimeout(() => { codeInput.value = ''; codeInput.focus(); }, 50);
+            return;
+          }
+          if (err === 'GAME_STARTED') {
+            pendingEmail = null; pendingCode = null;
+            pendingFirstName = null; pendingLastName = null;
+            myEmail = null; myCode = null;
+            myFirstName = null; myLastName = null;
+            clearSession();
+            showLateJoinBanner();
+            showView('email');
+            return;
+          }
+          emailErr.textContent = errorMessage(err);
+          showView('email');
+          return;
+        }
+
+        myEmail = email;
+        myFirstName = firstName;
+        myLastName = lastName || '';
+        myCode = code;
+        saveSession(email, code, firstName, lastName || '');
+        document.getElementById('lobby-greeting').textContent =
+          `You're in, ${escapeHtml(firstName.split(/\s+/)[0])}.`;
+      });
+    }
+
+    // ===== State events =====
+
+    socket.on('state:lobby', () => {
+      if (!myEmail) return;
+      hideAnswerCounter();
+      stopTimer();
+      if (myFirstName) {
+        document.getElementById('lobby-greeting').textContent =
+          `You're in, ${escapeHtml(myFirstName.split(/\s+/)[0])}.`;
+      }
+      showView('lobby');
+    });
+
+    // Stage E: question_preview phase. Player sees only the question NUMBER.
+    // Server's payload to /play is intentionally limited to {index, total} —
+    // even devtools can't reveal the question text because the server didn't
+    // send it. By design, the player looks at the projector.
+    socket.on('state:question_preview', (q) => {
+      if (!myEmail) return;
+      currentQIndex = q.index;
+      currentAnswered = false;
+      stopTimer();
+      hideAnswerCounter();
+
+      const num = (q.index || 0) + 1;
+      const total = q.total || 0;
+      document.getElementById('p-q-num-current').textContent = `Question ${num}`;
+      document.getElementById('p-q-num-of').textContent = total ? `of ${total}` : '';
+
+      showView('preview');
+    });
+
+    socket.on('state:question', (q) => {
+      if (!myEmail) return;
+      currentQIndex = q.index;
+      currentAnswered = false;
+
+      document.getElementById('q-counter').textContent = `Question ${q.index + 1} of ${q.total}`;
+      document.getElementById('q-text').textContent = q.text;
+
+      const optionsEl = document.getElementById('q-options');
+      optionsEl.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'option';
+        btn.innerHTML = `<span class="letter">${letters[i]}</span><span>${escapeHtml(opt)}</span>`;
+        btn.addEventListener('click', () => submitAnswer(i, btn));
+        optionsEl.appendChild(btn);
+      });
+
+      showAnswerCounter();
+
+      const skewMs = Date.now() - q.serverNow;
+      startTimer(q.endsAt + skewMs);
+
+      showView('question');
+    });
+
+    socket.on('state:answerCount', (a) => {
+      if (!myEmail) return;
+      const text = `${(a.count || 0).toLocaleString()} of ${(a.total || 0).toLocaleString()} answered`;
+      document.getElementById('q-answer-counter').textContent = text;
+      document.getElementById('locked-answer-counter').textContent = text;
+
+      if (a.final && !currentAnswered && !views.question.classList.contains('hidden')) {
+        showTimeUp();
+      }
+    });
+
+    function submitAnswer(option, btnEl) {
+      const all = document.querySelectorAll('#q-options .option');
+      all.forEach((b) => { b.disabled = true; });
+      btnEl.classList.add('selected');
+
+      socket.emit('player:answer', { qIndex: currentQIndex, option }, (ack) => {
+        if (!ack || !ack.ok) {
+          all.forEach((b) => { b.disabled = false; });
+          btnEl.classList.remove('selected');
+          console.warn('answer rejected:', ack && ack.error);
+          if (ack && (ack.error === 'Not joined' || ack.error === 'Unknown player')) {
+            myEmail = null; myCode = null;
+            myFirstName = null; myLastName = null;
+            clearSession();
+            stopTimer();
+            hideAnswerCounter();
+            showResetBanner();
+            showView('email');
+          }
+          return;
+        }
+        currentAnswered = true;
+        stopTimer();
+        showAnswerLocked();
+      });
+    }
+
+    socket.on('state:reveal', (r) => {
+      if (!myEmail) return;
+      stopTimer();
+      hideAnswerCounter();
+      renderReveal(r);
+      showView('reveal');
+    });
+
+    function renderReveal(r) {
+      const yr = r.yourResult || {};
+
+      document.getElementById('r-q-meta').textContent =
+        `Question ${(r.index != null ? r.index : 0) + 1}`;
+      document.getElementById('r-q-text').textContent = r.questionText || '';
+
+      const verdictEl = document.getElementById('r-verdict');
+      const pointsEl  = document.getElementById('r-points');
+      pointsEl.classList.remove('zero');
+      if (yr.yourOption == null) {
+        verdictEl.textContent = "Time's up!";
+        verdictEl.className = 'verdict timeup';
+        pointsEl.textContent = '+0';
+        pointsEl.classList.add('zero');
+      } else if (yr.correct) {
+        verdictEl.textContent = 'Correct!';
+        verdictEl.className = 'verdict correct';
+        pointsEl.textContent = '+' + (yr.pointsAwarded || 0);
+      } else {
+        verdictEl.textContent = 'Incorrect';
+        verdictEl.className = 'verdict wrong';
+        pointsEl.textContent = '+0';
+        pointsEl.classList.add('zero');
+      }
+
+      const optsEl = document.getElementById('r-options');
+      optsEl.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+      const correctIndex = r.correctOption;
+      const myPick = (yr.yourOption == null) ? null : yr.yourOption;
+      (r.options || []).forEach((opt, i) => {
+        const row = document.createElement('div');
+        let cls = 'option-result';
+        let mark = '';
+        if (i === correctIndex) {
+          cls += ' correct';
+          mark = '<span class="mark" aria-label="Correct answer">✓</span>';
+        } else if (myPick != null && i === myPick) {
+          cls += ' wrong-pick';
+          mark = '<span class="mark" aria-label="Your incorrect choice">✗</span>';
+        }
+        row.className = cls;
+        row.innerHTML =
+          `<span class="letter">${letters[i]}</span>` +
+          `<span class="text">${escapeHtml(opt)}</span>` +
+          mark;
+        optsEl.appendChild(row);
+      });
+    }
+
+    socket.on('state:finished', () => {
+      if (!myEmail) return;
+      stopTimer();
+      hideAnswerCounter();
+      showView('finished');
+    });
+
+    function showAnswerLocked() {
+      const icon = document.getElementById('locked-icon');
+      icon.classList.remove('timeup');
+      icon.textContent = '✓';
+      document.getElementById('locked-title').textContent = 'Answer locked in';
+      document.getElementById('locked-subtitle').textContent = 'Waiting for the reveal…';
+      showView('locked');
+    }
+    function showTimeUp() {
+      const icon = document.getElementById('locked-icon');
+      icon.classList.add('timeup');
+      icon.textContent = '⏱';
+      document.getElementById('locked-title').textContent = "Time's up!";
+      document.getElementById('locked-subtitle').textContent = "You didn't answer in time. Hold tight for the reveal…";
+      showView('locked');
+    }
+
+    socket.on('state:reset', () => {
+      myEmail = null; myCode = null;
+      myFirstName = null; myLastName = null;
+      pendingEmail = null; pendingCode = null;
+      pendingFirstName = null; pendingLastName = null;
+      currentQIndex = -1;
+      currentAnswered = false;
+      stopTimer();
+      hideAnswerCounter();
+      clearSession();
+      firstNameInput.value = '';
+      lastNameInput.value = '';
+      emailInput.value = '';
+      emailErr.textContent = '';
+      joinBtn.disabled = false;
+      joinBtn.textContent = 'Continue';
+      codeInput.value = '';
+      codeErr.textContent = '';
+      codeBtn.disabled = false;
+      codeBtn.textContent = 'Join';
+      hideLateJoinBanner();
+      showResetBanner();
+      document.getElementById('lobby-greeting').textContent = "You're in.";
+      showView('email');
+    });
+
+    function showResetBanner() {
+      hideLateJoinBanner();
+      resetBanner.classList.remove('hidden');
+      if (resetBannerTimer) clearTimeout(resetBannerTimer);
+      resetBannerTimer = setTimeout(() => resetBanner.classList.add('hidden'), 6000);
+    }
+    function hideResetBanner() {
+      resetBanner.classList.add('hidden');
+      if (resetBannerTimer) { clearTimeout(resetBannerTimer); resetBannerTimer = null; }
+    }
+    function showLateJoinBanner() {
+      hideResetBanner();
+      lateJoinBanner.classList.remove('hidden');
+      if (lateJoinBannerTimer) clearTimeout(lateJoinBannerTimer);
+      lateJoinBannerTimer = setTimeout(() => lateJoinBanner.classList.add('hidden'), 10000);
+    }
+    function hideLateJoinBanner() {
+      lateJoinBanner.classList.add('hidden');
+      if (lateJoinBannerTimer) { clearTimeout(lateJoinBannerTimer); lateJoinBannerTimer = null; }
+    }
+
+    function showAnswerCounter() {
+      document.getElementById('q-answer-counter').classList.remove('hidden');
+      document.getElementById('locked-answer-counter').classList.remove('hidden');
+    }
+    function hideAnswerCounter() {
+      document.getElementById('q-answer-counter').classList.add('hidden');
+      document.getElementById('locked-answer-counter').classList.add('hidden');
+    }
+
+    function startTimer(endsAtLocalMs) {
+      stopTimer();
+      const el = document.getElementById('q-timer');
+      function tick() {
+        const remaining = Math.max(0, endsAtLocalMs - Date.now());
+        const sec = Math.ceil(remaining / 1000);
+        el.textContent = sec + 's';
+        el.classList.toggle('warn', sec <= 5);
+        if (remaining <= 0) stopTimer();
+      }
+      tick();
+      timerInterval = setInterval(tick, 200);
+    }
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

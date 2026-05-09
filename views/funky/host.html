@@ -4,284 +4,365 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Quiz — Host Console</title>
+  <!-- favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* ============================================================
+       Funky / neobrutalist theme — Stage F.
+       Same tokens as /play and /board. Host console has more
+       structural elements (stats cards, badges, action buttons,
+       leaderboard) — all neobrutalist-styled with hard shadows.
+       ============================================================ */
     :root {
-      --brand: #0064FF;
-      --brand-dark: #0050D0;
-      --bg: #F5F7FB;
-      --surface: #FFFFFF;
-      --text: #0E1A2B;
-      --muted: #6B7280;
-      --line: #E5E7EB;
-      --green: #15B886;
-      --red: #E5484D;
-      --amber: #F59E0B;
-      --gold: #F4C430;
-      --shadow: 0 1px 2px rgba(14,26,43,0.04), 0 8px 24px rgba(14,26,43,0.06);
+      --purple: #7b2fff;
+      --purple-dark: #4a0fc7;
+      --yellow: #ffe600;
+      --yellow-dark: #d4bc00;
+      --ink: #141018;
+      --paper: #fef7ff;
+      --mint: #4ef2c6;
+      --coral: #ff5c7a;
+      --shadow: 6px 6px 0 var(--ink);
+      --shadow-sm: 4px 4px 0 var(--ink);
+      --shadow-xs: 3px 3px 0 var(--ink);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --font: 'Fredoka', system-ui, -apple-system, sans-serif;
     }
+
     * { box-sizing: border-box; }
+
     html, body {
       margin: 0; padding: 0;
-      background: var(--bg); color: var(--text);
-      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
-      font-size: 16px; line-height: 1.5;
+      font-family: var(--font);
+      color: var(--ink);
+      font-size: 16px; line-height: 1.45;
     }
-    body { min-height: 100vh; }
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 20% 20%, #fff2a8 0%, transparent 45%),
+        radial-gradient(circle at 80% 10%, #e4d4ff 0%, transparent 40%),
+        linear-gradient(165deg, #ffeef9 0%, #dcd6ff 40%, #b9f0ff 100%);
+      background-attachment: fixed;
+    }
 
+    /* ---------- Top bar ---------- */
     .topbar {
-      background: var(--brand); color: #fff;
-      padding: 14px 24px;
+      padding: 16px 24px;
       display: flex; align-items: center; gap: 14px;
     }
-    .topbar .logo { height: 30px; filter: brightness(0) invert(1); }
+    .topbar .logo {
+      height: 34px;
+      filter: drop-shadow(2px 2px 0 var(--ink));
+    }
     .topbar h1 {
-      margin: 0; font-size: 16px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.04em;
+      margin: 0; font-size: 18px; font-weight: 700;
+      letter-spacing: 0.02em;
     }
     .topbar .label {
-      margin-left: 6px; padding: 3px 8px;
-      background: rgba(255,255,255,0.15);
-      border-radius: 6px;
-      font-size: 11px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 4px 10px;
+      background: var(--purple); color: var(--paper);
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      font-size: 12px; font-weight: 700;
+      letter-spacing: 0.06em;
+      box-shadow: var(--shadow-xs);
     }
     .topbar .conn-status {
       margin-left: auto;
       display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      background: var(--yellow);
       font-size: 13px; font-weight: 600;
+      box-shadow: var(--shadow-xs);
     }
     .topbar .conn-status .dot {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: rgba(255,255,255,0.4);
-      transition: background 0.2s, box-shadow 0.2s;
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--ink);
     }
-    .topbar .conn-status.online  .dot { background: #4ADE80; box-shadow: 0 0 8px #4ADE80; }
-    .topbar .conn-status.offline .dot { background: #FCA5A5; }
-    .topbar .conn-status.offline { background: var(--red); margin: -14px -24px -14px auto; padding: 14px 24px; }
+    .topbar .conn-status.online   { background: var(--mint); }
+    .topbar .conn-status.offline  { background: var(--coral); color: var(--paper); }
+    .topbar .conn-status.offline .dot { background: var(--paper); }
 
-    main { max-width: 960px; margin: 0 auto; padding: 28px 24px; }
+    main { max-width: 980px; margin: 0 auto; padding: 8px 24px 32px; }
 
+    /* ---------- Card ---------- */
     .card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 28px;
+      background: var(--paper);
+      border: 4px solid var(--ink);
+      border-radius: var(--radius);
+      padding: 26px;
       box-shadow: var(--shadow);
-      margin-bottom: 20px;
+      margin-bottom: 22px;
     }
     .card h2 {
-      margin: 0 0 6px; font-size: 22px; font-weight: 800;
+      margin: 0 0 6px; font-size: 22px; font-weight: 700;
+      letter-spacing: -0.01em;
     }
     .card .sub {
-      margin: 0 0 24px; color: var(--muted); font-size: 14px;
+      margin: 0 0 22px; opacity: 0.75; font-size: 14px; font-weight: 500;
     }
 
+    /* ---------- Token form ---------- */
     .token-form { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
     .token-form label {
-      font-size: 13px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.06em;
+      font-size: 12px; font-weight: 700; color: var(--ink);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      display: block; margin-bottom: 6px;
     }
     .token-form input {
-      width: 100%; padding: 14px 16px;
-      font-size: 16px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+      width: 100%; padding: 13px 15px;
+      font-size: 15px; font-family: inherit; font-weight: 500;
       letter-spacing: 0.02em;
-      border: 2px solid var(--line); border-radius: 10px;
-      background: #fff; color: var(--text);
-      outline: none; transition: border-color 0.15s;
+      border: 3px solid var(--ink); border-radius: var(--radius-sm);
+      background: #fff; color: var(--ink);
+      outline: none;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
     }
-    .token-form input:focus { border-color: var(--brand); }
+    .token-form input:focus {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 var(--purple);
+    }
 
+    /* ---------- Buttons ---------- */
     .btn {
-      padding: 14px 22px;
+      padding: 13px 22px;
       font-size: 15px; font-weight: 700; font-family: inherit;
-      border: none; border-radius: 10px;
+      border: 4px solid var(--ink); border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: background 0.15s, transform 0.05s, opacity 0.15s, border-color 0.15s, color 0.15s;
+      box-shadow: var(--shadow);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.15s;
     }
-    .btn-primary    { background: var(--brand); color: #fff; }
-    .btn-primary:active:not(:disabled)  { transform: scale(0.98); background: var(--brand-dark); }
-    .btn-secondary  { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
-    .btn-secondary:hover:not(:disabled) { border-color: var(--brand); }
-    .btn-danger     { background: var(--amber); color: #fff; }
-    .btn-danger:active:not(:disabled)   { transform: scale(0.98); }
-    /* Stage D: podium-reveal button gets gold treatment to feel celebratory.
-       Visually distinct from the standard primary brand button so the host
-       knows this is the special end-of-game ceremonial action. */
+    .btn-primary    { background: var(--purple); color: var(--paper); }
+    .btn-secondary  { background: var(--paper);  color: var(--ink); }
+    .btn-danger     { background: var(--yellow); color: var(--ink); }
+    /* Stage D: podium-reveal button gets a yellow→coral gradient with extra
+       glow to feel celebratory and visually distinct from the main actions. */
     .btn-celebrate  {
-      background: linear-gradient(135deg, #F4C430 0%, #FF8C00 100%);
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(244, 196, 48, 0.3);
+      background: linear-gradient(135deg, var(--yellow) 0%, var(--coral) 100%);
+      color: var(--ink);
     }
-    .btn-celebrate:active:not(:disabled) { transform: scale(0.98); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn:active:not(:disabled) {
+      transform: translate(3px, 3px);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+    .btn:disabled {
+      opacity: 0.45; cursor: not-allowed;
+      box-shadow: var(--shadow-sm);
+    }
 
-    .err { color: var(--red); font-size: 14px; min-height: 18px; }
+    .err {
+      color: var(--coral); font-size: 14px; min-height: 18px;
+      font-weight: 600;
+    }
 
+    /* ---------- Stats row ---------- */
     .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
+      gap: 14px;
+      margin-bottom: 22px;
     }
     .stat {
-      padding: 18px 20px;
-      background: var(--bg);
-      border: 1px solid var(--line);
-      border-radius: 12px;
+      padding: 16px 18px;
+      background: #fff;
+      border: 3px solid var(--ink); border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
     }
     .stat .label {
-      font-size: 11px; font-weight: 700; color: var(--muted);
+      font-size: 11px; font-weight: 700; color: var(--ink);
       text-transform: uppercase; letter-spacing: 0.08em;
+      opacity: 0.75;
     }
     .stat .value {
-      font-size: 36px; font-weight: 800;
+      font-size: 36px; font-weight: 700;
       font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
       margin-top: 4px;
+      line-height: 1.05;
     }
     .stat .value.large { font-size: 44px; }
 
+    /* ---------- Question display ---------- */
     .q-display {
       padding: 22px 24px;
-      background: var(--bg);
-      border: 1px solid var(--line);
-      border-radius: 12px;
+      background: linear-gradient(135deg, #fff8b0, var(--yellow));
+      border: 3px solid var(--ink); border-radius: var(--radius);
       margin-bottom: 22px;
+      box-shadow: var(--shadow-sm);
     }
     .q-display .q-meta {
-      font-size: 12px; font-weight: 700; color: var(--muted);
+      display: inline-block;
+      font-size: 11px; font-weight: 700; color: var(--ink);
       text-transform: uppercase; letter-spacing: 0.08em;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
+      padding: 4px 10px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: 999px;
     }
     .q-display .q-text {
       font-size: 22px; font-weight: 700; line-height: 1.3;
-      margin: 0 0 18px;
+      margin: 0 0 18px; letter-spacing: -0.01em;
     }
     .q-display .opts {
       display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
       transition: opacity 200ms ease-out;
     }
+    /* Mini colored tiles in the host preview — same yellow/mint/purple/coral
+       pattern as /play and /board, just compact. JS sets class="opt" + may
+       add ".correct" on reveal; nth-child gives the color regardless. */
     .q-display .opt {
       padding: 12px 14px;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 8px;
+      background: #fff;
+      border: 3px solid var(--ink); border-radius: var(--radius-sm);
       display: flex; align-items: center; gap: 10px;
-      font-size: 15px;
+      font-size: 15px; font-weight: 600;
+      box-shadow: var(--shadow-xs);
     }
+    .q-display .opt:nth-child(1) { background: var(--yellow); color: var(--ink); }
+    .q-display .opt:nth-child(2) { background: var(--mint);   color: var(--ink); }
+    .q-display .opt:nth-child(3) { background: var(--purple); color: var(--paper); }
+    .q-display .opt:nth-child(4) { background: var(--coral);  color: var(--paper); }
     .q-display .opt .letter {
-      flex: 0 0 24px; height: 24px; border-radius: 50%;
-      background: var(--brand); color: #fff;
+      flex: 0 0 26px; height: 26px; border-radius: 50%;
+      background: var(--ink); color: var(--paper);
       display: inline-flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 12px;
     }
-    .q-display .opt.correct {
-      background: rgba(21, 184, 134, 0.12);
-      border-color: var(--green);
+    .q-display .opt:nth-child(3) .letter,
+    .q-display .opt:nth-child(4) .letter {
+      background: var(--paper); color: var(--ink);
     }
-    .q-display .opt.correct .letter { background: var(--green); }
-    .q-display.preview .opts { opacity: 0.55; }
+    .q-display .opt.correct {
+      outline: 4px solid var(--ink);
+      outline-offset: 2px;
+    }
+    .q-display.preview .opts { opacity: 0.45; }
 
+    /* ---------- Actions row ---------- */
     .actions {
       display: flex; gap: 12px;
       padding-top: 20px;
-      border-top: 1px solid var(--line);
+      border-top: 3px dashed var(--ink);
       align-items: center;
       flex-wrap: wrap;
     }
     .actions .btn { min-width: 160px; }
     .actions .spacer { flex: 1; }
 
+    /* ---------- Badge (state pill) ---------- */
     .badge {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 10px; border-radius: 999px;
+      padding: 5px 12px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
       font-size: 12px; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.06em;
+      box-shadow: var(--shadow-xs);
     }
-    .badge.lobby    { background: rgba(0,100,255,0.10); color: var(--brand); }
-    .badge.preview  { background: rgba(245,158,11,0.08); color: #B45309; }
-    .badge.active   { background: rgba(245,158,11,0.12); color: var(--amber); }
-    .badge.closed   { background: rgba(229,72,77,0.10);  color: var(--red); }
-    .badge.revealed { background: rgba(21,184,134,0.12); color: var(--green); }
-    .badge.finished { background: rgba(0,0,0,0.06); color: var(--text); }
-    /* Stage D: when game is finished AND podium revealed — gold celebration tint. */
+    .badge.lobby    { background: var(--paper);  color: var(--ink); }
+    .badge.preview  { background: var(--yellow); color: var(--ink); }
+    .badge.active   { background: var(--coral);  color: var(--paper); }
+    .badge.closed   { background: var(--ink);    color: var(--paper); }
+    .badge.revealed { background: var(--mint);   color: var(--ink); }
+    .badge.finished { background: var(--purple); color: var(--paper); }
     .badge.podiumRevealed {
-      background: linear-gradient(135deg, rgba(244,196,48,0.15) 0%, rgba(255,140,0,0.15) 100%);
-      color: #B45309;
+      background: linear-gradient(135deg, var(--yellow) 0%, var(--coral) 100%);
+      color: var(--ink);
     }
     .badge .pulse {
-      display: inline-block; width: 6px; height: 6px;
+      display: inline-block; width: 7px; height: 7px;
       border-radius: 50%; background: currentColor;
       animation: hostpulse 1.4s ease-in-out infinite;
     }
     @keyframes hostpulse {
-      0%,100% { opacity: 0.4; transform: scale(0.8); }
-      50%     { opacity: 1;   transform: scale(1.1); }
+      0%, 100% { opacity: 0.4; transform: scale(0.8); }
+      50%      { opacity: 1;   transform: scale(1.15); }
     }
 
     .header-meta {
       display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
     }
     .room-code {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 12px;
+      border: 3px dashed var(--ink); border-radius: 999px;
       font-size: 13px; font-weight: 600;
-      color: var(--muted);
-      letter-spacing: 0.02em;
+      background: rgba(255, 255, 255, 0.55);
     }
     .room-code .num {
-      font-family: 'JetBrains Mono', ui-monospace, monospace;
       font-weight: 700;
-      color: var(--brand);
-      font-size: 15px;
-      letter-spacing: 0.08em;
-      margin-left: 4px;
+      color: var(--purple-dark);
+      font-size: 16px;
+      letter-spacing: 0.12em;
+      font-variant-numeric: tabular-nums;
     }
 
+    /* ---------- Leaderboard ---------- */
     .reveal-leaderboard {
       margin-top: 18px;
+      padding: 18px 20px;
+      background: #fff;
+      border: 3px solid var(--ink); border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
     }
     .reveal-leaderboard h3 {
-      font-size: 13px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.06em;
-      margin: 0 0 10px;
+      font-size: 12px; font-weight: 700; color: var(--ink);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin: 0 0 12px;
     }
     .reveal-leaderboard .row {
       display: flex; align-items: center; gap: 12px;
-      padding: 10px 0; border-bottom: 1px solid var(--line);
+      padding: 9px 0;
+      border-bottom: 2px solid #eee5f5;
     }
     .reveal-leaderboard .row:last-child { border-bottom: none; }
     .reveal-leaderboard .pos {
-      width: 28px; height: 28px; border-radius: 50%;
-      background: var(--bg); color: var(--text);
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--yellow); color: var(--ink);
+      border: 2px solid var(--ink);
       display: inline-flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 13px;
     }
+    .reveal-leaderboard .row:nth-child(2) .pos { background: var(--mint); }
+    .reveal-leaderboard .row:nth-child(3) .pos { background: var(--coral); color: var(--paper); }
     .reveal-leaderboard .name {
       flex: 1; font-weight: 600;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .reveal-leaderboard .pts {
       font-variant-numeric: tabular-nums; font-weight: 700;
+      color: var(--purple-dark);
     }
     .reveal-leaderboard .empty {
-      padding: 14px 0; color: var(--muted); font-size: 14px; font-style: italic;
+      padding: 14px 0; opacity: 0.6; font-size: 14px;
+      font-style: italic;
     }
 
+    /* ---------- Toast ---------- */
     .toast {
       position: fixed; left: 50%; bottom: 32px;
       transform: translateX(-50%) translateY(20px);
       padding: 12px 20px;
-      background: var(--text); color: #fff;
-      border-radius: 10px; font-weight: 600; font-size: 14px;
-      box-shadow: 0 10px 30px rgba(14,26,43,0.25);
+      background: var(--ink); color: var(--paper);
+      border: 3px solid var(--ink);
+      border-radius: var(--radius-sm);
+      font-weight: 700; font-size: 14px;
+      box-shadow: var(--shadow);
       opacity: 0; pointer-events: none;
       transition: opacity 0.2s, transform 0.2s;
       z-index: 100;
     }
-    .toast.show {
-      opacity: 1; transform: translateX(-50%) translateY(0);
-    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     .hidden { display: none !important; }
   </style>
@@ -313,14 +394,14 @@
     </section>
 
     <section id="view-game" class="card hidden">
-      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px;">
         <div>
-          <h2 style="margin-bottom: 0;">Game Console</h2>
+          <h2 style="margin-bottom: 4px;">Game Console</h2>
           <p class="sub" style="margin-bottom: 0;">Server-authoritative scoring. Every action below is persisted.</p>
         </div>
         <div class="header-meta">
           <span class="badge lobby" id="state-badge"><span class="pulse"></span><span id="state-text">Lobby</span></span>
-          <span class="room-code">Room code:<span class="num" id="host-room-code">—</span></span>
+          <span class="room-code">Room code <span class="num" id="host-room-code">—</span></span>
         </div>
       </div>
 
@@ -401,8 +482,6 @@
     let lastReveal   = null;
     let lastAnswerCount = { count: 0, total: 0 };
     let lastPlayerCount = 0;
-    // Stage D: tracks game.podiumRevealed flag from state:finished payload +
-    // state:podiumRevealed event. Drives the Reveal Podium button visibility.
     let podiumRevealed = false;
     let timerInterval = null;
     let toastTimer = null;
@@ -557,10 +636,6 @@
         updateButtonState();
       });
 
-      // Stage D: state:finished now carries top10 (was podium, with 5 entries)
-      // and the podiumRevealed flag. Host displays top 5 in the console as
-      // before — the moderator doesn't need the full top-10 list (that's for
-      // /board to render with celebration animation).
       socket.on('state:finished', (f) => {
         serverState = 'finished';
         podiumRevealed = !!(f && f.podiumRevealed);
@@ -578,9 +653,6 @@
         updateButtonState();
       });
 
-      // Stage D: live transition from blurred-list to revealed-pillars on
-      // /board. Host UI just needs to flip the local flag and update buttons —
-      // no visual celebration on the moderator console.
       socket.on('state:podiumRevealed', () => {
         podiumRevealed = true;
         if (serverState === 'finished') {
@@ -669,9 +741,6 @@
       });
     });
 
-    // Stage D: trigger the on-screen podium celebration. No confirm dialog —
-    // it's irreversible-but-not-destructive, and the moderator wants instant
-    // feedback when they hit this for the dramatic moment.
     btnRevealPodium.addEventListener('click', () => {
       if (btnRevealPodium.disabled) return;
       socket.emit('host:revealPodium', {}, (ack) => {
@@ -708,10 +777,6 @@
       btnReveal.disabled  = !connected || (serverState !== 'active' && serverState !== 'closed');
       btnReveal.textContent = serverState === 'active' ? 'Reveal Early' : 'Reveal';
 
-      // Stage D: Reveal Podium button visibility. Only relevant in FINISHED
-      // state, only enabled before the first reveal click. After reveal we
-      // hide it entirely so the host UI doesn't have a dead button cluttering
-      // the action bar.
       if (serverState === 'finished' && !podiumRevealed) {
         btnRevealPodium.hidden = false;
         btnRevealPodium.disabled = !connected;

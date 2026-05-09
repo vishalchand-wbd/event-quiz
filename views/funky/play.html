@@ -3,319 +3,457 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#0064FF">
+  <meta name="theme-color" content="#7b2fff">
   <title>Quiz</title>
+  <!-- favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* ============================================================
+       Funky / neobrutalist theme — Stage F.
+       Color tokens, hard offset shadows, thick ink borders, bouncy
+       motion. Mirrors the palette in the quizzy reference repo.
+       ============================================================ */
     :root {
-      --brand: #0064FF;
-      --brand-dark: #0050D0;
-      --bg: #ffffff;
-      --surface: #F5F7FB;
-      --text: #0E1A2B;
-      --muted: #6B7280;
-      --line: #E5E7EB;
-      --green: #15B886;
-      --red: #E5484D;
-      --shadow: 0 1px 2px rgba(14, 26, 43, 0.04), 0 4px 16px rgba(14, 26, 43, 0.06);
+      --purple: #7b2fff;
+      --purple-dark: #4a0fc7;
+      --yellow: #ffe600;
+      --yellow-dark: #d4bc00;
+      --ink: #141018;
+      --paper: #fef7ff;
+      --mint: #4ef2c6;
+      --coral: #ff5c7a;
+      --shadow: 6px 6px 0 var(--ink);
+      --shadow-sm: 4px 4px 0 var(--ink);
+      --shadow-xs: 3px 3px 0 var(--ink);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --font: 'Fredoka', system-ui, -apple-system, sans-serif;
     }
+
     * { box-sizing: border-box; }
+
     html, body {
       margin: 0; padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+      min-height: 100%;
+      font-family: var(--font);
+      color: var(--ink);
       font-size: 17px;
-      line-height: 1.5;
+      line-height: 1.45;
       -webkit-tap-highlight-color: transparent;
       overscroll-behavior: none;
     }
-    body { min-height: 100dvh; display: flex; flex-direction: column; }
+    body {
+      min-height: 100dvh;
+      display: flex; flex-direction: column;
+      background:
+        radial-gradient(circle at 20% 20%, #fff2a8 0%, transparent 45%),
+        radial-gradient(circle at 80% 10%, #e4d4ff 0%, transparent 40%),
+        linear-gradient(165deg, #ffeef9 0%, #dcd6ff 40%, #b9f0ff 100%);
+      background-attachment: fixed;
+    }
 
+    /* ---------- Header ---------- */
     header {
-      background: var(--brand); color: #fff;
-      padding: 14px 16px;
+      padding: 16px 18px 10px;
       display: flex; align-items: center; gap: 10px;
     }
-    header .logo { height: 28px; width: auto; filter: brightness(0) invert(1); }
+    header .logo {
+      height: 34px; width: auto;
+      filter: drop-shadow(2px 2px 0 var(--ink));
+    }
     header h1 {
-      margin: 0; font-size: 16px; font-weight: 700;
-      letter-spacing: 0.02em; text-transform: uppercase;
+      margin: 0; font-size: 18px; font-weight: 700;
+      letter-spacing: 0.02em;
     }
+    /* Connection indicator: pill with a colored dot + status text via CSS pseudo-elements.
+       The element comes in empty from HTML; existing JS only toggles .online / .offline,
+       so we render the label entirely in CSS — no JS changes. */
     header .conn {
-      margin-left: auto; width: 8px; height: 8px;
-      border-radius: 50%; background: rgba(255,255,255,0.4);
-      transition: background 0.2s;
+      margin-left: auto;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      background: var(--yellow);
+      font-size: 13px; font-weight: 600;
+      box-shadow: var(--shadow-xs);
+      color: var(--ink);
     }
-    header .conn.online  { background: #4ADE80; box-shadow: 0 0 6px #4ADE80; }
-    header .conn.offline { background: #FCA5A5; }
+    header .conn::before {
+      content: "";
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--ink);
+    }
+    header .conn::after { content: "Connecting…"; }
+    header .conn.online { background: var(--mint); }
+    header .conn.online::after { content: "Connected"; }
+    header .conn.offline {
+      background: var(--coral); color: var(--paper);
+    }
+    header .conn.offline::before { background: var(--paper); }
+    header .conn.offline::after { content: "Offline"; }
 
-    main { flex: 1; padding: 20px 16px 32px; display: flex; flex-direction: column; }
+    /* ---------- Main / cards ---------- */
+    main {
+      flex: 1;
+      padding: 14px 18px 32px;
+      display: flex; flex-direction: column;
+    }
     .card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 24px 20px;
+      background: var(--paper);
+      border: 4px solid var(--ink);
+      border-radius: var(--radius);
+      padding: 22px 20px;
       box-shadow: var(--shadow);
     }
     .center { display: flex; flex-direction: column; justify-content: center; flex: 1; }
 
-    /* Identity gate */
-    .email-form { display: flex; flex-direction: column; gap: 16px; }
+    /* ---------- Identity gate ---------- */
+    .email-form { display: flex; flex-direction: column; gap: 14px; }
     .email-form label {
-      font-size: 13px; font-weight: 600; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.06em;
+      font-size: 12px; font-weight: 700; color: var(--ink);
+      text-transform: uppercase; letter-spacing: 0.08em;
       display: block; margin-bottom: 6px;
     }
     .email-form .row-2 {
       display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
     }
     .email-form input {
-      width: 100%; padding: 14px 16px;
-      font-size: 17px; font-family: inherit;
-      border: 2px solid var(--line); border-radius: 12px;
-      background: #fff; color: var(--text);
-      outline: none; transition: border-color 0.15s;
+      width: 100%; padding: 13px 15px;
+      font-size: 16px; font-family: inherit; font-weight: 500;
+      border: 3px solid var(--ink); border-radius: var(--radius-sm);
+      background: #fff; color: var(--ink);
+      outline: none;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
     }
-    .email-form input:focus { border-color: var(--brand); }
-    .email-form .err { color: var(--red); font-size: 14px; min-height: 18px; }
+    .email-form input:focus {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 var(--purple);
+    }
+    .email-form .err {
+      color: var(--coral); font-size: 14px; min-height: 18px;
+      font-weight: 600;
+    }
     .email-form .field-hint {
-      font-size: 12px; color: var(--muted);
-      margin-top: 4px;
+      font-size: 12px; color: var(--ink); opacity: 0.75;
+      margin-top: 4px; font-weight: 500;
     }
     .email-form .label-optional {
-      text-transform: none; font-weight: 500; color: var(--muted);
+      text-transform: none; font-weight: 500; opacity: 0.6;
     }
 
-    /* Code gate */
-    .code-form { display: flex; flex-direction: column; gap: 16px; }
+    /* ---------- Code gate ---------- */
+    .code-form { display: flex; flex-direction: column; gap: 14px; }
     .code-form .hint {
-      font-size: 14px; color: var(--muted);
-      text-align: center;
+      font-size: 14px; color: var(--ink); opacity: 0.85;
+      text-align: center; font-weight: 600;
       margin: 0 0 4px;
     }
     .code-form label {
-      font-size: 14px; font-weight: 600; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.06em;
-      text-align: center;
+      font-size: 12px; font-weight: 700; color: var(--ink);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      text-align: center; display: block; margin-bottom: 6px;
     }
     .code-form input {
-      width: 100%; padding: 18px 18px;
-      font-size: 32px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+      width: 100%; padding: 16px 14px;
+      font-size: 32px; font-family: inherit;
       font-weight: 700;
       letter-spacing: 0.4em;
       text-align: center;
-      border: 2px solid var(--line); border-radius: 12px;
-      background: #fff; color: var(--text);
-      outline: none; transition: border-color 0.15s;
+      border: 4px dashed var(--ink); border-radius: var(--radius);
+      background: linear-gradient(135deg, var(--yellow), #fff8b0);
+      color: var(--ink);
+      outline: none;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      box-shadow: var(--shadow-sm);
     }
-    .code-form input:focus { border-color: var(--brand); }
-    .code-form .err { color: var(--red); font-size: 14px; min-height: 18px; text-align: center; }
+    .code-form input:focus {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 var(--purple);
+    }
+    .code-form .err {
+      color: var(--coral); font-size: 14px; min-height: 18px;
+      text-align: center; font-weight: 600;
+    }
     .code-back-btn {
       background: none; border: none;
-      color: var(--muted); font-family: inherit; font-size: 14px;
+      color: var(--purple-dark); font-family: inherit; font-size: 14px;
+      font-weight: 600;
       text-decoration: underline; cursor: pointer;
       padding: 8px;
       align-self: center;
     }
-    .code-back-btn:hover { color: var(--brand); }
 
+    /* ---------- Buttons ---------- */
     .btn-primary {
-      width: 100%; padding: 18px;
+      width: 100%; padding: 16px;
       font-size: 17px; font-weight: 700; font-family: inherit;
-      background: var(--brand); color: #fff;
-      border: none; border-radius: 12px;
+      background: var(--purple); color: var(--paper);
+      border: 4px solid var(--ink); border-radius: var(--radius);
       cursor: pointer;
-      transition: background 0.15s, transform 0.05s;
+      box-shadow: var(--shadow);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
     }
-    .btn-primary:active   { transform: scale(0.98); background: var(--brand-dark); }
-    .btn-primary:disabled { background: #B0BCCC; cursor: not-allowed; }
+    .btn-primary:active:not(:disabled) {
+      transform: translate(3px, 3px);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+    .btn-primary:disabled {
+      background: #c8c2d4; color: #6a6478;
+      cursor: not-allowed;
+      box-shadow: var(--shadow-sm);
+    }
 
-    /* Lobby */
-    .lobby h2 { margin: 0 0 6px; font-size: 24px; font-weight: 800; }
-    .lobby p { margin: 0 0 20px; color: var(--muted); }
+    /* ---------- Lobby ---------- */
+    .lobby h2 {
+      margin: 0 0 8px; font-size: 26px; font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .lobby p { margin: 0 0 18px; opacity: 0.85; font-weight: 500; }
     .lobby .pulse {
       display: inline-block; width: 10px; height: 10px;
-      border-radius: 50%; background: var(--brand);
+      border-radius: 50%; background: var(--purple);
       margin-right: 8px;
       animation: pulse 1.4s ease-in-out infinite;
     }
     @keyframes pulse {
       0%, 100% { opacity: 0.3; transform: scale(0.8); }
-      50%      { opacity: 1;   transform: scale(1.1); }
+      50%      { opacity: 1;   transform: scale(1.15); }
     }
 
-    /* Preview — player sees only the question NUMBER, not the text. They
-       look at the projector for the actual question content. This builds
-       tension for the moderator's "Reveal Options" click and (deliberately)
-       prevents glance-cheating where someone races to read the question
-       text on their phone before the host is ready. */
-    .preview-state { text-align: center; padding: 16px 0; }
+    /* ---------- Preview ---------- */
+    .preview-state { text-align: center; padding: 14px 0; }
     .preview-state .preview-label {
-      font-size: 13px; font-weight: 700; color: var(--brand);
-      text-transform: uppercase; letter-spacing: 0.08em;
-      margin-bottom: 14px;
+      display: inline-block;
+      font-size: 13px; font-weight: 700; color: var(--ink);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 18px;
+      padding: 6px 14px;
+      background: var(--yellow);
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      box-shadow: var(--shadow-xs);
     }
     .preview-state .preview-q-num {
-      font-size: 44px; font-weight: 800; margin: 0 0 16px; line-height: 1.1;
-      letter-spacing: -0.02em;
+      font-size: 46px; font-weight: 700; margin: 0 0 16px;
+      line-height: 1.05; letter-spacing: -0.02em;
     }
     .preview-state .preview-q-num .of {
-      color: var(--muted);
+      opacity: 0.55;
       font-weight: 600;
-      font-size: 0.65em;
+      font-size: 0.6em;
     }
-    .preview-state .preview-hint { color: var(--muted); margin: 0; font-size: 15px; }
+    .preview-state .preview-hint {
+      margin: 0; font-size: 15px; font-weight: 500; opacity: 0.8;
+    }
 
-    /* Question */
+    /* ---------- Question ---------- */
     .qheader {
       display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 14px;
-      font-size: 13px; font-weight: 600; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.06em;
+      font-size: 12px; font-weight: 700; color: var(--ink);
+      text-transform: uppercase; letter-spacing: 0.08em;
     }
     .timer {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 10px;
-      background: var(--brand); color: #fff;
+      padding: 6px 14px;
+      background: var(--yellow); color: var(--ink);
+      border: 3px solid var(--ink);
       border-radius: 999px;
       font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      box-shadow: var(--shadow-xs);
     }
-    .timer.warn { background: var(--red); }
+    .timer.warn {
+      background: var(--coral); color: var(--paper);
+      animation: warnpulse 0.65s ease-in-out infinite;
+    }
+    @keyframes warnpulse {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.08); }
+    }
     .question-text {
       font-size: 22px; font-weight: 700; line-height: 1.3;
-      margin: 0 0 24px;
+      margin: 0 0 18px;
+      letter-spacing: -0.01em;
     }
+    /* Colored answer tiles — yellow / mint / purple / coral, matching the
+       quizzy palette. JS sets each option to class="option"; nth-child gives
+       the four colors without any JS change. */
     .options { display: flex; flex-direction: column; gap: 12px; }
     .option {
-      width: 100%; padding: 18px 18px;
-      font-size: 17px; font-weight: 600; font-family: inherit;
+      width: 100%; padding: 16px 18px;
+      font-size: 17px; font-weight: 700; font-family: inherit;
       text-align: left;
-      background: #fff; color: var(--text);
-      border: 2px solid var(--line); border-radius: 14px;
+      border: 4px solid var(--ink); border-radius: 14px;
       cursor: pointer;
       display: flex; align-items: center; gap: 14px;
-      transition: border-color 0.15s, background 0.15s, transform 0.05s;
+      box-shadow: var(--shadow);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      background: var(--yellow);
+      color: var(--ink);
     }
-    .option:active { transform: scale(0.98); }
-    .option:hover  { border-color: var(--brand); }
+    .option:nth-child(1) { background: var(--yellow); color: var(--ink); }
+    .option:nth-child(2) { background: var(--mint);   color: var(--ink); }
+    .option:nth-child(3) { background: var(--purple); color: var(--paper); }
+    .option:nth-child(4) { background: var(--coral);  color: var(--paper); }
+    .option:not(:disabled):active {
+      transform: translate(3px, 3px);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+    .option:disabled { opacity: 0.55; cursor: not-allowed; }
     .option .letter {
-      flex: 0 0 32px; height: 32px; border-radius: 50%;
-      background: var(--brand); color: #fff;
+      flex: 0 0 34px; height: 34px; border-radius: 50%;
+      background: var(--ink); color: var(--paper);
       display: inline-flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 14px;
+      border: 2px solid var(--ink);
     }
-    .option:disabled       { opacity: 0.5; cursor: not-allowed; }
-    .option.selected       { border-color: var(--brand); background: rgba(0,100,255,0.06); }
+    .option:nth-child(3) .letter,
+    .option:nth-child(4) .letter {
+      background: var(--paper); color: var(--ink);
+    }
+    .option.selected {
+      transform: translate(3px, 3px);
+      box-shadow: 3px 3px 0 var(--ink);
+      outline: 3px solid var(--purple-dark);
+      outline-offset: 2px;
+    }
 
     /* Answer counter */
     .answer-counter {
-      margin-top: 16px;
+      margin-top: 14px;
       padding: 10px 14px;
-      background: rgba(0,100,255,0.06);
-      border-radius: 10px;
-      color: var(--brand);
+      background: #fff;
+      border: 3px solid var(--ink);
+      border-radius: var(--radius-sm);
+      color: var(--ink);
       font-size: 14px; font-weight: 600;
       text-align: center;
       font-variant-numeric: tabular-nums;
+      box-shadow: var(--shadow-xs);
     }
 
-    /* Locked (covers both "answer locked" and "time's up" sub-states) */
+    /* ---------- Locked / time's up ---------- */
     .locked .icon {
-      width: 56px; height: 56px; margin: 0 auto 16px;
-      border-radius: 50%; background: var(--brand); color: #fff;
+      width: 64px; height: 64px; margin: 0 auto 18px;
+      border-radius: 50%;
+      background: var(--mint); color: var(--ink);
       display: flex; align-items: center; justify-content: center;
-      font-size: 28px;
+      font-size: 28px; font-weight: 700;
+      border: 4px solid var(--ink);
+      box-shadow: var(--shadow);
     }
-    .locked .icon.timeup { background: var(--red); }
-    .locked h2 { margin: 0 0 8px; font-size: 22px; text-align: center; }
-    .locked p  { margin: 0 0 16px; text-align: center; color: var(--muted); }
+    .locked .icon.timeup { background: var(--coral); color: var(--paper); }
+    .locked h2 {
+      margin: 0 0 8px; font-size: 24px; text-align: center;
+      font-weight: 700;
+    }
+    .locked p {
+      margin: 0 0 16px; text-align: center; opacity: 0.8;
+      font-weight: 500;
+    }
 
-    /* Reveal */
+    /* ---------- Reveal ---------- */
     .reveal-q-meta {
-      font-size: 12px; font-weight: 700; color: var(--muted);
+      display: inline-block;
+      font-size: 12px; font-weight: 700; color: var(--ink);
       text-transform: uppercase; letter-spacing: 0.08em;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+      padding: 4px 10px;
+      background: var(--yellow);
+      border: 2px solid var(--ink);
+      border-radius: 999px;
     }
     .reveal-q-text {
       font-size: 18px; font-weight: 700; line-height: 1.35;
       margin: 0 0 18px;
     }
     .reveal .verdict {
-      font-size: 26px; font-weight: 800;
-      margin: 0;
-      text-align: center;
+      font-size: 30px; font-weight: 700;
+      margin: 0; text-align: center;
+      letter-spacing: -0.01em;
     }
-    .reveal .verdict.correct { color: var(--green); }
-    .reveal .verdict.wrong   { color: var(--red); }
-    .reveal .verdict.timeup  { color: var(--muted); }
+    .reveal .verdict.correct { color: var(--purple-dark); }
+    .reveal .verdict.wrong   { color: var(--coral); }
+    .reveal .verdict.timeup  { color: var(--ink); opacity: 0.6; }
     .reveal .points {
-      font-size: 44px; font-weight: 800;
-      font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+      font-size: 48px; font-weight: 700;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
       margin: 4px 0 22px;
       text-align: center;
     }
-    .reveal .points.zero { color: var(--muted); }
+    .reveal .points.zero { opacity: 0.5; }
 
     .option-result {
       width: 100%; padding: 14px 16px;
       font-size: 16px; font-weight: 600;
-      background: #fff; color: var(--text);
-      border: 2px solid var(--line); border-radius: 14px;
+      background: #fff; color: var(--ink);
+      border: 3px solid var(--ink); border-radius: 14px;
       display: flex; align-items: center; gap: 12px;
+      box-shadow: var(--shadow-xs);
     }
     .option-result .letter {
       flex: 0 0 30px; height: 30px; border-radius: 50%;
-      background: var(--surface); color: var(--text);
+      background: var(--ink); color: var(--paper);
       display: inline-flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 13px;
     }
     .option-result .text { flex: 1; }
     .option-result .mark {
-      flex: 0 0 28px; height: 28px; border-radius: 50%;
+      flex: 0 0 30px; height: 30px; border-radius: 50%;
       display: inline-flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 16px; color: #fff;
+      font-weight: 700; font-size: 16px;
       line-height: 1;
+      border: 2px solid var(--ink);
     }
-    .option-result.correct {
-      border-color: var(--green);
-      background: rgba(21, 184, 134, 0.06);
-    }
-    .option-result.correct .letter { background: var(--green); color: #fff; }
-    .option-result.correct .mark   { background: var(--green); }
+    .option-result.correct { background: var(--mint); }
+    .option-result.correct .mark { background: var(--ink); color: var(--paper); }
     .option-result.wrong-pick {
-      border-color: var(--red);
-      background: rgba(229, 72, 77, 0.06);
+      background: var(--coral); color: var(--paper);
     }
-    .option-result.wrong-pick .letter { background: var(--red); color: #fff; }
-    .option-result.wrong-pick .mark   { background: var(--red); }
+    .option-result.wrong-pick .letter { background: var(--paper); color: var(--ink); }
+    .option-result.wrong-pick .mark { background: var(--paper); color: var(--ink); }
 
-    /* Finished */
+    /* ---------- Finished thanks ---------- */
     .thanks { text-align: center; }
-    .thanks-icon { font-size: 64px; line-height: 1; margin-bottom: 16px; }
-    .thanks h2 { font-size: 28px; font-weight: 800; margin: 0 0 12px; }
-    .thanks p  { color: var(--muted); margin: 0; }
+    .thanks-icon {
+      font-size: 64px; line-height: 1; margin-bottom: 16px;
+      filter: drop-shadow(3px 3px 0 var(--ink));
+    }
+    .thanks h2 {
+      font-size: 28px; font-weight: 700; margin: 0 0 12px;
+      letter-spacing: -0.01em;
+    }
+    .thanks p { opacity: 0.8; margin: 0; font-weight: 500; }
 
-    /* Banners */
+    /* ---------- Banners ---------- */
     .reset-banner {
       padding: 12px 16px; margin-bottom: 16px;
-      background: rgba(0,100,255,0.08);
-      border: 1px solid rgba(0,100,255,0.2);
-      border-radius: 12px;
-      color: var(--brand);
-      font-size: 14px; font-weight: 600;
+      background: var(--yellow);
+      border: 3px solid var(--ink);
+      border-radius: var(--radius-sm);
+      color: var(--ink);
+      font-size: 14px; font-weight: 700;
       text-align: center;
+      box-shadow: var(--shadow-xs);
     }
     .late-join-banner {
       padding: 12px 16px; margin-bottom: 16px;
-      background: rgba(229,72,77,0.08);
-      border: 1px solid rgba(229,72,77,0.25);
-      border-radius: 12px;
-      color: var(--red);
-      font-size: 14px; font-weight: 600;
+      background: var(--coral);
+      border: 3px solid var(--ink);
+      border-radius: var(--radius-sm);
+      color: var(--paper);
+      font-size: 14px; font-weight: 700;
       text-align: center;
+      box-shadow: var(--shadow-xs);
     }
 
     .hidden { display: none !important; }
@@ -376,8 +514,7 @@
       </div>
     </section>
 
-    <!-- 4. Preview — host has shown the question on the projector but
-         hasn't revealed options/timer yet. Player sees the number only. -->
+    <!-- 4. Preview -->
     <section id="view-preview" class="card center hidden">
       <div class="preview-state">
         <div class="preview-label">Get ready</div>
@@ -722,10 +859,6 @@
       showView('lobby');
     });
 
-    // Stage E: question_preview phase. Player sees only the question NUMBER.
-    // Server's payload to /play is intentionally limited to {index, total} —
-    // even devtools can't reveal the question text because the server didn't
-    // send it. By design, the player looks at the projector.
     socket.on('state:question_preview', (q) => {
       if (!myEmail) return;
       currentQIndex = q.index;

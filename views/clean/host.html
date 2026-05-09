@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz — Host Console</title>
+  <!-- favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #0064FF;
+      --brand-dark: #0050D0;
+      --bg: #F5F7FB;
+      --surface: #FFFFFF;
+      --text: #0E1A2B;
+      --muted: #6B7280;
+      --line: #E5E7EB;
+      --green: #15B886;
+      --red: #E5484D;
+      --amber: #F59E0B;
+      --gold: #F4C430;
+      --shadow: 0 1px 2px rgba(14,26,43,0.04), 0 8px 24px rgba(14,26,43,0.06);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg); color: var(--text);
+      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+      font-size: 16px; line-height: 1.5;
+    }
+    body { min-height: 100vh; }
+
+    .topbar {
+      background: var(--brand); color: #fff;
+      padding: 14px 24px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .topbar .logo { height: 30px; filter: brightness(0) invert(1); }
+    .topbar h1 {
+      margin: 0; font-size: 16px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .topbar .label {
+      margin-left: 6px; padding: 3px 8px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 6px;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .topbar .conn-status {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600;
+    }
+    .topbar .conn-status .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: rgba(255,255,255,0.4);
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .topbar .conn-status.online  .dot { background: #4ADE80; box-shadow: 0 0 8px #4ADE80; }
+    .topbar .conn-status.offline .dot { background: #FCA5A5; }
+    .topbar .conn-status.offline { background: var(--red); margin: -14px -24px -14px auto; padding: 14px 24px; }
+
+    main { max-width: 960px; margin: 0 auto; padding: 28px 24px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      margin: 0 0 6px; font-size: 22px; font-weight: 800;
+    }
+    .card .sub {
+      margin: 0 0 24px; color: var(--muted); font-size: 14px;
+    }
+
+    .token-form { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
+    .token-form label {
+      font-size: 13px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .token-form input {
+      width: 100%; padding: 14px 16px;
+      font-size: 16px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+      letter-spacing: 0.02em;
+      border: 2px solid var(--line); border-radius: 10px;
+      background: #fff; color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .token-form input:focus { border-color: var(--brand); }
+
+    .btn {
+      padding: 14px 22px;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      border: none; border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s, opacity 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn-primary    { background: var(--brand); color: #fff; }
+    .btn-primary:active:not(:disabled)  { transform: scale(0.98); background: var(--brand-dark); }
+    .btn-secondary  { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--brand); }
+    .btn-danger     { background: var(--amber); color: #fff; }
+    .btn-danger:active:not(:disabled)   { transform: scale(0.98); }
+    /* Stage D: podium-reveal button gets gold treatment to feel celebratory.
+       Visually distinct from the standard primary brand button so the host
+       knows this is the special end-of-game ceremonial action. */
+    .btn-celebrate  {
+      background: linear-gradient(135deg, #F4C430 0%, #FF8C00 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(244, 196, 48, 0.3);
+    }
+    .btn-celebrate:active:not(:disabled) { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .err { color: var(--red); font-size: 14px; min-height: 18px; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      padding: 18px 20px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+    .stat .label {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .stat .value {
+      font-size: 36px; font-weight: 800;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+      margin-top: 4px;
+    }
+    .stat .value.large { font-size: 44px; }
+
+    .q-display {
+      padding: 22px 24px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      margin-bottom: 22px;
+    }
+    .q-display .q-meta {
+      font-size: 12px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+    .q-display .q-text {
+      font-size: 22px; font-weight: 700; line-height: 1.3;
+      margin: 0 0 18px;
+    }
+    .q-display .opts {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      transition: opacity 200ms ease-out;
+    }
+    .q-display .opt {
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 15px;
+    }
+    .q-display .opt .letter {
+      flex: 0 0 24px; height: 24px; border-radius: 50%;
+      background: var(--brand); color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 12px;
+    }
+    .q-display .opt.correct {
+      background: rgba(21, 184, 134, 0.12);
+      border-color: var(--green);
+    }
+    .q-display .opt.correct .letter { background: var(--green); }
+    .q-display.preview .opts { opacity: 0.55; }
+
+    .actions {
+      display: flex; gap: 12px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .actions .btn { min-width: 160px; }
+    .actions .spacer { flex: 1; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .badge.lobby    { background: rgba(0,100,255,0.10); color: var(--brand); }
+    .badge.preview  { background: rgba(245,158,11,0.08); color: #B45309; }
+    .badge.active   { background: rgba(245,158,11,0.12); color: var(--amber); }
+    .badge.closed   { background: rgba(229,72,77,0.10);  color: var(--red); }
+    .badge.revealed { background: rgba(21,184,134,0.12); color: var(--green); }
+    .badge.finished { background: rgba(0,0,0,0.06); color: var(--text); }
+    /* Stage D: when game is finished AND podium revealed — gold celebration tint. */
+    .badge.podiumRevealed {
+      background: linear-gradient(135deg, rgba(244,196,48,0.15) 0%, rgba(255,140,0,0.15) 100%);
+      color: #B45309;
+    }
+    .badge .pulse {
+      display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: currentColor;
+      animation: hostpulse 1.4s ease-in-out infinite;
+    }
+    @keyframes hostpulse {
+      0%,100% { opacity: 0.4; transform: scale(0.8); }
+      50%     { opacity: 1;   transform: scale(1.1); }
+    }
+
+    .header-meta {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+    }
+    .room-code {
+      font-size: 13px; font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .room-code .num {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 700;
+      color: var(--brand);
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      margin-left: 4px;
+    }
+
+    .reveal-leaderboard {
+      margin-top: 18px;
+    }
+    .reveal-leaderboard h3 {
+      font-size: 13px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin: 0 0 10px;
+    }
+    .reveal-leaderboard .row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--line);
+    }
+    .reveal-leaderboard .row:last-child { border-bottom: none; }
+    .reveal-leaderboard .pos {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--bg); color: var(--text);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+    }
+    .reveal-leaderboard .name {
+      flex: 1; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .reveal-leaderboard .pts {
+      font-variant-numeric: tabular-nums; font-weight: 700;
+    }
+    .reveal-leaderboard .empty {
+      padding: 14px 0; color: var(--muted); font-size: 14px; font-style: italic;
+    }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 32px;
+      transform: translateX(-50%) translateY(20px);
+      padding: 12px 20px;
+      background: var(--text); color: #fff;
+      border-radius: 10px; font-weight: 600; font-size: 14px;
+      box-shadow: 0 10px 30px rgba(14,26,43,0.25);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 100;
+    }
+    .toast.show {
+      opacity: 1; transform: translateX(-50%) translateY(0);
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="/logo.png" alt="" class="logo" onerror="this.style.display='none'">
+    <h1>Live Quiz</h1>
+    <span class="label">Host Console</span>
+    <div class="conn-status offline" id="conn-status">
+      <span class="dot"></span>
+      <span id="conn-text">Disconnected</span>
+    </div>
+  </div>
+
+  <main>
+
+    <section id="view-token" class="card">
+      <h2>Moderator access</h2>
+      <p class="sub">Enter the host token printed by <code>install.sh</code> at deploy time.</p>
+      <form class="token-form" id="token-form">
+        <div>
+          <label for="token">Host token</label>
+          <input type="password" id="token" autocomplete="off" required>
+        </div>
+        <div class="err" id="token-err"></div>
+        <div><button class="btn btn-primary" type="submit">Connect</button></div>
+      </form>
+    </section>
+
+    <section id="view-game" class="card hidden">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 24px;">
+        <div>
+          <h2 style="margin-bottom: 0;">Game Console</h2>
+          <p class="sub" style="margin-bottom: 0;">Server-authoritative scoring. Every action below is persisted.</p>
+        </div>
+        <div class="header-meta">
+          <span class="badge lobby" id="state-badge"><span class="pulse"></span><span id="state-text">Lobby</span></span>
+          <span class="room-code">Room code:<span class="num" id="host-room-code">—</span></span>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="label">Question</div>
+          <div class="value" id="stat-q">—</div>
+        </div>
+        <div class="stat">
+          <div class="label" id="stat-mid-label">Players Joined</div>
+          <div class="value large" id="stat-mid">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">Time Left</div>
+          <div class="value" id="stat-time">—</div>
+        </div>
+      </div>
+
+      <div class="q-display hidden" id="q-display">
+        <div class="q-meta" id="q-meta">Current Question</div>
+        <h3 class="q-text" id="q-text">…</h3>
+        <div class="opts" id="q-opts"></div>
+      </div>
+
+      <div class="reveal-leaderboard hidden" id="reveal-leaderboard">
+        <h3 id="leaderboard-title">Top 5 right now</h3>
+        <div id="leaderboard-body"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary"   id="btn-advance"        disabled>Advance</button>
+        <button class="btn btn-danger"    id="btn-reveal"         disabled>Reveal</button>
+        <!-- Stage D: only visible in FINISHED state when podium not yet revealed -->
+        <button class="btn btn-celebrate" id="btn-reveal-podium"  disabled hidden>🏆 Reveal Podium</button>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary" id="btn-reset"          disabled>Reset</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    'use strict';
+
+    const viewToken  = document.getElementById('view-token');
+    const viewGame   = document.getElementById('view-game');
+    const tokenForm  = document.getElementById('token-form');
+    const tokenInput = document.getElementById('token');
+    const tokenErr   = document.getElementById('token-err');
+    const connStatus = document.getElementById('conn-status');
+    const connText   = document.getElementById('conn-text');
+    const stateBadge = document.getElementById('state-badge');
+    const stateText  = document.getElementById('state-text');
+    const roomCodeEl = document.getElementById('host-room-code');
+    const statQ      = document.getElementById('stat-q');
+    const statMidLab = document.getElementById('stat-mid-label');
+    const statMid    = document.getElementById('stat-mid');
+    const statTime   = document.getElementById('stat-time');
+    const qDisplay   = document.getElementById('q-display');
+    const qMeta      = document.getElementById('q-meta');
+    const qText      = document.getElementById('q-text');
+    const qOpts      = document.getElementById('q-opts');
+    const lbWrap     = document.getElementById('reveal-leaderboard');
+    const lbTitle    = document.getElementById('leaderboard-title');
+    const lbBody     = document.getElementById('leaderboard-body');
+    const btnAdvance = document.getElementById('btn-advance');
+    const btnReveal  = document.getElementById('btn-reveal');
+    const btnRevealPodium = document.getElementById('btn-reveal-podium');
+    const btnReset   = document.getElementById('btn-reset');
+    const toast      = document.getElementById('toast');
+
+    let socket = null;
+    let hostToken = null;
+    let serverState = 'lobby';
+    let lastQuestion = null;
+    let lastReveal   = null;
+    let lastAnswerCount = { count: 0, total: 0 };
+    let lastPlayerCount = 0;
+    // Stage D: tracks game.podiumRevealed flag from state:finished payload +
+    // state:podiumRevealed event. Drives the Reveal Podium button visibility.
+    let podiumRevealed = false;
+    let timerInterval = null;
+    let toastTimer = null;
+
+    const urlToken = new URLSearchParams(window.location.search).get('token');
+    if (urlToken) {
+      tokenInput.value = urlToken;
+    }
+
+    tokenForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      tokenErr.textContent = '';
+      const t = tokenInput.value.trim();
+      if (!t) { tokenErr.textContent = 'Token required.'; return; }
+      hostToken = t;
+      connect();
+    });
+
+    function connect() {
+      if (socket) socket.disconnect();
+      socket = io({
+        transports: ['websocket'],
+        auth: { role: 'host', token: hostToken },
+      });
+      attachHandlers();
+    }
+
+    function attachHandlers() {
+      socket.on('connect', () => {
+        connStatus.classList.remove('offline'); connStatus.classList.add('online');
+        connText.textContent = 'Connected';
+        viewToken.classList.add('hidden');
+        viewGame.classList.remove('hidden');
+        updateButtonState();
+      });
+
+      socket.on('disconnect', () => {
+        connStatus.classList.remove('online'); connStatus.classList.add('offline');
+        connText.textContent = 'Disconnected — reconnecting…';
+        updateButtonState();
+      });
+
+      socket.on('connect_error', (err) => {
+        connText.textContent = 'Connection failed';
+        tokenErr.textContent = err.message || 'Connection failed.';
+        viewToken.classList.remove('hidden');
+        viewGame.classList.add('hidden');
+      });
+
+      socket.on('error', (err) => {
+        if (err && err.message) {
+          tokenErr.textContent = err.message;
+          viewToken.classList.remove('hidden');
+          viewGame.classList.add('hidden');
+        }
+      });
+
+      socket.on('state:meta', (m) => {
+        roomCodeEl.textContent = (m && m.code) || '—';
+      });
+
+      socket.on('state:lobby', (p) => {
+        serverState = 'lobby';
+        lastQuestion = null;
+        lastReveal = null;
+        lastPlayerCount = p.playerCount || 0;
+        podiumRevealed = false;
+        statQ.textContent = '—';
+        statMidLab.textContent = 'Players Joined';
+        statMid.textContent = lastPlayerCount.toLocaleString();
+        statTime.textContent = '—';
+        qDisplay.classList.add('hidden');
+        qDisplay.classList.remove('preview');
+        lbWrap.classList.add('hidden');
+        setBadge('lobby', 'Lobby');
+        stopTimer();
+        updateButtonState();
+      });
+
+      socket.on('state:question_preview', (q) => {
+        serverState = 'preview';
+        lastQuestion = q;
+        lastReveal = null;
+
+        statQ.textContent = `${(q.index || 0) + 1} / ${q.total}`;
+        statMidLab.textContent = 'Players Joined';
+        statMid.textContent = lastPlayerCount.toLocaleString();
+        statTime.textContent = '—';
+
+        qMeta.textContent = 'Preview — options hidden from players';
+        renderQuestion(q, null);
+        qDisplay.classList.add('preview');
+        qDisplay.classList.remove('hidden');
+        lbWrap.classList.add('hidden');
+
+        setBadge('preview', 'Preview');
+        stopTimer();
+        updateButtonState();
+      });
+
+      socket.on('state:question', (q) => {
+        serverState = (Date.now() < q.endsAt) ? 'active' : 'closed';
+        lastQuestion = q;
+        lastReveal = null;
+
+        statQ.textContent = `${q.index + 1} / ${q.total}`;
+        statMidLab.textContent = 'Answers In';
+        statMid.textContent = `${lastAnswerCount.count.toLocaleString()} / ${lastAnswerCount.total.toLocaleString()}`;
+        qMeta.textContent = 'Current Question';
+        renderQuestion(q, null);
+        qDisplay.classList.remove('preview');
+        qDisplay.classList.remove('hidden');
+        lbWrap.classList.add('hidden');
+
+        const skewMs = Date.now() - q.serverNow;
+        startTimer(q.endsAt + skewMs);
+
+        setBadge(serverState, serverState === 'active' ? 'Live' : 'Time up');
+        updateButtonState();
+      });
+
+      socket.on('state:answerCount', (a) => {
+        lastAnswerCount = { count: a.count || 0, total: a.total || 0 };
+        if (serverState === 'active' || serverState === 'closed') {
+          statMidLab.textContent = 'Answers In';
+          statMid.textContent = `${lastAnswerCount.count.toLocaleString()} / ${lastAnswerCount.total.toLocaleString()}`;
+        }
+        if (a.final) {
+          serverState = 'closed';
+          stopTimer();
+          statTime.textContent = '0s';
+          setBadge('closed', 'Time up');
+          updateButtonState();
+        }
+      });
+
+      socket.on('state:reveal', (r) => {
+        serverState = 'revealed';
+        lastReveal = r;
+        qMeta.textContent = 'Current Question';
+        renderQuestion(lastQuestion || { text: r.questionText, options: r.options }, r.correctOption);
+        qDisplay.classList.remove('preview');
+        qDisplay.classList.remove('hidden');
+        lbTitle.textContent = 'Top 5 right now';
+        renderLeaderboard(r.leaderboard || []);
+        lbWrap.classList.remove('hidden');
+        statMidLab.textContent = '% Correct';
+        statMid.textContent = (r.pctCorrect || 0) + '%';
+        statTime.textContent = '—';
+        stopTimer();
+        setBadge('revealed', 'Revealed');
+        updateButtonState();
+      });
+
+      // Stage D: state:finished now carries top10 (was podium, with 5 entries)
+      // and the podiumRevealed flag. Host displays top 5 in the console as
+      // before — the moderator doesn't need the full top-10 list (that's for
+      // /board to render with celebration animation).
+      socket.on('state:finished', (f) => {
+        serverState = 'finished';
+        podiumRevealed = !!(f && f.podiumRevealed);
+        statQ.textContent = '—';
+        statMidLab.textContent = 'Game';
+        statMid.textContent = 'Done';
+        statTime.textContent = '—';
+        qDisplay.classList.add('hidden');
+        qDisplay.classList.remove('preview');
+        lbTitle.textContent = 'Final Top 5';
+        renderLeaderboard((f && f.top10) || []);
+        lbWrap.classList.remove('hidden');
+        setBadge(podiumRevealed ? 'podiumRevealed' : 'finished',
+                 podiumRevealed ? 'Podium Revealed' : 'Finished');
+        updateButtonState();
+      });
+
+      // Stage D: live transition from blurred-list to revealed-pillars on
+      // /board. Host UI just needs to flip the local flag and update buttons —
+      // no visual celebration on the moderator console.
+      socket.on('state:podiumRevealed', () => {
+        podiumRevealed = true;
+        if (serverState === 'finished') {
+          setBadge('podiumRevealed', 'Podium Revealed');
+        }
+        showToast('🏆 Podium revealed on screen');
+        updateButtonState();
+      });
+
+      socket.on('state:reset', () => {
+        lastAnswerCount = { count: 0, total: 0 };
+        lastQuestion = null;
+        lastReveal = null;
+        podiumRevealed = false;
+        showToast('Game reset — back to lobby');
+      });
+    }
+
+    function displayName(p) {
+      if (!p) return '—';
+      const first = (p.firstName || '').trim();
+      const last  = (p.lastName  || '').trim();
+      const full = (first + ' ' + last).trim();
+      return full || '—';
+    }
+
+    function setBadge(cls, text) {
+      stateBadge.className = 'badge ' + cls;
+      stateBadge.innerHTML = `<span class="pulse"></span><span>${text}</span>`;
+    }
+
+    function renderQuestion(q, correctIndex) {
+      qText.textContent = q.text || '';
+      qOpts.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+      (q.options || []).forEach((opt, i) => {
+        const div = document.createElement('div');
+        div.className = 'opt' + (correctIndex === i ? ' correct' : '');
+        div.innerHTML = `<span class="letter">${letters[i]}</span><span>${escapeHtml(opt)}</span>`;
+        qOpts.appendChild(div);
+      });
+    }
+
+    function renderLeaderboard(rows) {
+      lbBody.innerHTML = '';
+      const list = (rows || []).slice(0, 5);
+      if (list.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No players have scored yet.';
+        lbBody.appendChild(empty);
+        return;
+      }
+      list.forEach((p, i) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML =
+          `<span class="pos">${i + 1}</span>` +
+          `<span class="name">${escapeHtml(displayName(p))}</span>` +
+          `<span class="pts">${(p.score || 0).toLocaleString()}</span>`;
+        lbBody.appendChild(row);
+      });
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+    }
+
+    btnAdvance.addEventListener('click', () => {
+      if (btnAdvance.disabled) return;
+      socket.emit('host:advance', {}, (ack) => {
+        if (!ack || !ack.ok) console.warn('advance rejected:', ack && ack.error);
+      });
+    });
+
+    btnReveal.addEventListener('click', () => {
+      if (btnReveal.disabled) return;
+      if (serverState === 'active') {
+        if (!confirm('Question is still live. Reveal early and cut off remaining answers?')) return;
+      }
+      socket.emit('host:reveal', {}, (ack) => {
+        if (!ack || !ack.ok) console.warn('reveal rejected:', ack && ack.error);
+      });
+    });
+
+    // Stage D: trigger the on-screen podium celebration. No confirm dialog —
+    // it's irreversible-but-not-destructive, and the moderator wants instant
+    // feedback when they hit this for the dramatic moment.
+    btnRevealPodium.addEventListener('click', () => {
+      if (btnRevealPodium.disabled) return;
+      socket.emit('host:revealPodium', {}, (ack) => {
+        if (!ack || !ack.ok) console.warn('revealPodium rejected:', ack && ack.error);
+      });
+    });
+
+    btnReset.addEventListener('click', () => {
+      if (btnReset.disabled) return;
+      const msg = (serverState === 'finished')
+        ? 'Start a new game?\n\nThis clears all players and scores from the previous round so a fresh game can begin. A new room code will be generated.'
+        : 'Reset the game NOW?\n\nThis will clear all players and scores immediately, and rotate the room code. Use this only if the current game is unrecoverable. This cannot be undone.';
+      if (!confirm(msg)) return;
+      socket.emit('host:reset', {}, (ack) => {
+        if (!ack || !ack.ok) console.warn('reset rejected:', ack && ack.error);
+      });
+    });
+
+    function updateButtonState() {
+      const connected = socket && socket.connected;
+
+      btnAdvance.disabled = !connected || (
+        serverState !== 'lobby' &&
+        serverState !== 'preview' &&
+        serverState !== 'revealed'
+      );
+      btnAdvance.textContent =
+        serverState === 'lobby'    ? 'Start Quiz' :
+        serverState === 'preview'  ? 'Reveal Options' :
+        serverState === 'revealed' && lastQuestion && lastQuestion.index === lastQuestion.total - 1 ? 'Show Final Results' :
+        serverState === 'revealed' ? 'Next Question' :
+        serverState === 'finished' ? 'Finished' : 'Advance';
+
+      btnReveal.disabled  = !connected || (serverState !== 'active' && serverState !== 'closed');
+      btnReveal.textContent = serverState === 'active' ? 'Reveal Early' : 'Reveal';
+
+      // Stage D: Reveal Podium button visibility. Only relevant in FINISHED
+      // state, only enabled before the first reveal click. After reveal we
+      // hide it entirely so the host UI doesn't have a dead button cluttering
+      // the action bar.
+      if (serverState === 'finished' && !podiumRevealed) {
+        btnRevealPodium.hidden = false;
+        btnRevealPodium.disabled = !connected;
+      } else {
+        btnRevealPodium.hidden = true;
+        btnRevealPodium.disabled = true;
+      }
+
+      btnReset.disabled = !connected;
+      if (serverState === 'finished') {
+        btnReset.className = 'btn btn-primary';
+        btnReset.textContent = 'Start New Game';
+      } else {
+        btnReset.className = 'btn btn-secondary';
+        btnReset.textContent = 'Reset';
+      }
+    }
+
+    function startTimer(endsAtLocalMs) {
+      stopTimer();
+      function tick() {
+        const remaining = Math.max(0, endsAtLocalMs - Date.now());
+        const sec = Math.ceil(remaining / 1000);
+        statTime.textContent = sec + 's';
+        if (remaining <= 0) {
+          stopTimer();
+        }
+      }
+      tick();
+      timerInterval = setInterval(tick, 200);
+    }
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

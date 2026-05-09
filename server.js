@@ -83,6 +83,13 @@ const STATE_FILE = process.env.STATE_FILE || '/var/lib/quiz/state.jsonl';
 const QUIZ_FILE = process.env.QUIZ_FILE || path.join(__dirname, 'quiz.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// Theme selection. Set THEME=clean or THEME=funky in /etc/quiz/quiz.env to flip.
+// Default = funky (current as of Stage F). Both themes share server.js, the
+// wire contract, and persistence; only the HTML/CSS shipped to clients differs.
+const VALID_THEMES = ['clean', 'funky'];
+const THEME = (process.env.THEME || 'funky').toLowerCase();
+const VIEWS_DIR = path.join(__dirname, 'views', THEME);
+
 const ANSWER_COUNT_THROTTLE_MS = 250;
 
 if (!HOST_TOKEN) {
@@ -91,6 +98,14 @@ if (!HOST_TOKEN) {
 }
 if (!ALLOWED_EMAIL_DOMAIN) {
   console.error('FATAL: ALLOWED_EMAIL_DOMAIN environment variable not set.');
+  process.exit(1);
+}
+if (!VALID_THEMES.includes(THEME)) {
+  console.error(`FATAL: THEME="${THEME}" is invalid. Must be one of: ${VALID_THEMES.join(', ')}.`);
+  process.exit(1);
+}
+if (!fs.existsSync(VIEWS_DIR)) {
+  console.error(`FATAL: Theme directory not found: ${VIEWS_DIR}`);
   process.exit(1);
 }
 
@@ -661,9 +676,9 @@ function hostReset() {
 const app = express();
 app.use(express.static(PUBLIC_DIR));
 app.get('/', (_req, res) => res.redirect('/play'));
-app.get('/play', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'play.html')));
-app.get('/host', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'host.html')));
-app.get('/board', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'board.html')));
+app.get('/play', (_req, res) => res.sendFile(path.join(VIEWS_DIR, 'play.html')));
+app.get('/host', (_req, res) => res.sendFile(path.join(VIEWS_DIR, 'host.html')));
+app.get('/board', (_req, res) => res.sendFile(path.join(VIEWS_DIR, 'board.html')));
 app.get('/health', (_req, res) => res.json({
   status: 'ok',
   state: game.state,
@@ -897,6 +912,7 @@ httpServer.listen(PORT, () => {
   console.log(`Quiz server listening on :${PORT}`);
   console.log(`State file: ${STATE_FILE}`);
   console.log(`Allowed email domain: @${ALLOWED_EMAIL_DOMAIN}`);
+  console.log(`Active theme: ${THEME} (views from ${VIEWS_DIR})`);
   console.log(`Host token (first 4 chars): ${HOST_TOKEN.slice(0, 4)}...`);
   console.log(`Active room code: ${game.roomCode}`);
 });
