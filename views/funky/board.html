@@ -492,39 +492,81 @@
       letter-spacing: 0.12em; text-transform: uppercase;
       align-self: flex-start;
     }
+    /* Stage J: score-bars leaderboard (Claude Design variation B).
+       Top-3 rows get colored backgrounds (yellow/mint/coral) + hard shadow;
+       ranks 4-10 sit on paper. Each row: square pos chip | name+bar | score.
+       Bar width is rendered % relative to top score (set inline via JS).
+       Row sizing is vh-aware so all 10 rows fit reliably on shorter viewports
+       (1366x768, even 1024x768) without scroll. Top-3 names still blurred per
+       spec — handled by .leader-row.blurred .name { filter: blur(10px) }. */
     .reveal .leader-row {
-      display: flex; align-items: center; gap: clamp(10px, 1.4vw, 18px);
-      padding: clamp(7px, 1.1vh, 12px) clamp(12px, 1.4vw, 18px);
+      display: grid;
+      grid-template-columns: clamp(28px, 3.4vh, 38px) 1fr auto;
+      gap: clamp(8px, 1vw, 14px);
+      align-items: center;
+      padding: clamp(5px, 0.8vh, 10px) clamp(10px, 1.2vw, 16px);
       border: 3px solid var(--ink);
       border-radius: var(--radius-sm);
-      margin-bottom: clamp(4px, 0.7vh, 8px);
-      background: #fff;
-      box-shadow: var(--shadow-sm);
+      margin-bottom: clamp(3px, 0.5vh, 6px);
+      background: var(--paper);
+      min-height: 0;
     }
+    .reveal .leader-row.r1 { background: var(--yellow); box-shadow: 4px 4px 0 var(--ink); }
+    .reveal .leader-row.r2 { background: var(--mint);   box-shadow: 4px 4px 0 var(--ink); }
+    .reveal .leader-row.r3 { background: var(--coral); color: var(--paper); box-shadow: 4px 4px 0 var(--ink); }
     .reveal .leader-row .pos {
-      flex: 0 0 clamp(30px, min(2.8vw, 4vh), 44px); height: clamp(30px, min(2.8vw, 4vh), 44px); border-radius: 50%;
-      background: var(--yellow);
-      border: 3px solid var(--ink);
-      color: var(--ink);
+      width: 100%;
+      height: clamp(26px, 3.2vh, 36px);
+      border-radius: 8px;
+      background: var(--ink); color: var(--paper);
       display: inline-flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: clamp(12px, min(1.2vw, 1.7vh), 18px);
-    }
-    .reveal .leader-row:nth-child(2) .pos { background: var(--mint); }
-    .reveal .leader-row:nth-child(3) .pos { background: var(--coral); color: var(--paper); }
-    .reveal .leader-row .name {
-      flex: 1;
-      font-size: clamp(13px, min(1.4vw, 2vh), 22px);
       font-weight: 700;
+      font-size: clamp(13px, min(1.4vw, 1.8vh), 18px);
+      border: none;
+    }
+    .reveal .leader-row.r1 .pos { background: var(--ink); color: var(--yellow); }
+    .reveal .leader-row.r3 .pos { background: var(--paper); color: var(--ink); }
+    .reveal .leader-row .mid {
+      display: flex; flex-direction: column; gap: clamp(3px, 0.4vh, 5px);
+      min-width: 0;
+    }
+    .reveal .leader-row .name {
+      font-size: clamp(13px, min(1.4vw, 1.8vh), 20px);
+      font-weight: 600;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       transition: filter 600ms ease-out;
       color: var(--ink);
+      line-height: 1.1;
     }
+    .reveal .leader-row.r3 .name { color: var(--paper); }
+    .reveal .leader-row .bar {
+      height: clamp(4px, 0.7vh, 7px);
+      background: rgba(20,16,24,0.14);
+      border: 2px solid var(--ink);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .reveal .leader-row.r3 .bar {
+      background: rgba(254,247,255,0.25);
+      border-color: var(--paper);
+    }
+    .reveal .leader-row .bar-fill {
+      height: 100%;
+      background: var(--ink);
+      border-radius: 999px 0 0 999px;
+      transition: width 0.6s cubic-bezier(0.2, 0.8, 0.3, 1);
+    }
+    .reveal .leader-row.r1 .bar-fill { background: var(--purple); }
+    .reveal .leader-row.r2 .bar-fill { background: var(--ink); }
+    .reveal .leader-row.r3 .bar-fill { background: var(--paper); }
     .reveal .leader-row .pts {
       font-variant-numeric: tabular-nums;
       font-weight: 700;
-      font-size: clamp(14px, min(1.5vw, 2.2vh), 26px);
+      font-size: clamp(14px, min(1.5vw, 2vh), 22px);
       color: var(--purple-dark);
+      line-height: 1;
     }
+    .reveal .leader-row.r3 .pts { color: var(--paper); }
     .reveal .leader-row.blurred .name {
       filter: blur(10px);
       user-select: none;
@@ -572,13 +614,13 @@
 
     /* PHASE A — final standings list */
     .finished .standard-title {
-      margin: 0 0 clamp(14px, 2.2vh, 28px);
-      padding: clamp(10px, 1.6vh, 18px) clamp(28px, 4vw, 48px);
+      margin: 0 0 clamp(10px, 1.6vh, 22px);
+      padding: clamp(8px, 1.2vh, 14px) clamp(24px, 3.5vw, 42px);
       background: linear-gradient(135deg, var(--yellow), #fff8b0);
       border: 5px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      font-size: clamp(32px, min(5.5vw, 8vh), 76px);
+      font-size: clamp(28px, min(5vw, 7vh), 68px);
       font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--ink);
@@ -590,11 +632,11 @@
       margin-bottom: clamp(10px, 1.8vh, 24px);
     }
     .finished .top-10-list .row {
-      display: flex; align-items: center; gap: clamp(12px, 1.4vw, 18px);
-      padding: clamp(7px, 1.1vh, 12px) clamp(16px, 2.2vw, 24px);
+      display: flex; align-items: center; gap: clamp(10px, 1.2vw, 16px);
+      padding: clamp(5px, 0.8vh, 10px) clamp(14px, 2vw, 22px);
       border: 3px solid var(--ink);
       border-radius: var(--radius-sm);
-      margin-bottom: clamp(5px, 0.7vh, 8px);
+      margin-bottom: clamp(3px, 0.5vh, 6px);
       background: var(--paper);
       box-shadow: var(--shadow-sm);
     }
@@ -644,13 +686,13 @@
 
     /* PHASE B — celebration */
     .finished .celebration-title {
-      margin: 0 0 clamp(16px, 2.5vh, 36px);
-      padding: clamp(10px, 1.6vh, 18px) clamp(28px, 4vw, 52px);
+      margin: 0 0 clamp(12px, 1.8vh, 28px);
+      padding: clamp(8px, 1.2vh, 14px) clamp(24px, 3.5vw, 44px);
       background: linear-gradient(135deg, var(--gold) 0%, var(--gold-warm) 100%);
       border: 5px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      font-size: clamp(34px, min(6vw, 9vh), 92px);
+      font-size: clamp(30px, min(5vw, 7.5vh), 80px);
       font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--ink);
@@ -668,16 +710,16 @@
     .finished .podium {
       display: grid;
       grid-template-columns: 1fr 1.2fr 1fr;
-      gap: clamp(16px, 2vw, 28px);
+      gap: clamp(14px, 1.8vw, 24px);
       align-items: end;
       width: 100%;
       max-width: 1100px;
-      margin-bottom: clamp(16px, 2.5vh, 36px);
+      margin-bottom: clamp(12px, 1.8vh, 28px);
     }
     .finished .pillar {
       display: flex; flex-direction: column; align-items: center;
-      gap: clamp(6px, 1vh, 12px);
-      padding: clamp(12px, 2vh, 28px) clamp(14px, 2vw, 22px);
+      gap: clamp(4px, 0.7vh, 10px);
+      padding: clamp(10px, 1.5vh, 22px) clamp(12px, 1.6vw, 18px);
       background: var(--paper);
       border: 5px solid var(--ink);
       border-radius: var(--radius) var(--radius) 0 0;
@@ -685,8 +727,8 @@
       text-align: center;
     }
     .finished .pillar .medal {
-      font-size: clamp(28px, min(4.5vw, 6vh), 56px);
-      line-height: 1; margin-bottom: 4px;
+      font-size: clamp(24px, min(4vw, 5vh), 48px);
+      line-height: 1; margin-bottom: 2px;
       filter: drop-shadow(3px 3px 0 var(--ink));
     }
     .finished .pillar .name {
@@ -703,16 +745,16 @@
       color: var(--purple-dark);
     }
     .finished .pillar.gold {
-      padding-bottom: clamp(28px, 4.5vh, 64px);
+      padding-bottom: clamp(22px, 3.5vh, 50px);
       background: linear-gradient(180deg, var(--gold) 0%, #fff8b0 100%);
       box-shadow: 8px 8px 0 var(--ink), 0 0 60px rgba(255, 215, 0, 0.45);
     }
     .finished .pillar.silver {
-      padding-bottom: clamp(18px, 3vh, 40px);
+      padding-bottom: clamp(14px, 2.4vh, 32px);
       background: linear-gradient(180deg, #e8e8e8 0%, #f8f8f8 100%);
     }
     .finished .pillar.bronze {
-      padding-bottom: clamp(12px, 2vh, 24px);
+      padding-bottom: clamp(10px, 1.7vh, 20px);
       background: linear-gradient(180deg, #e8a168 0%, #f4cba0 100%);
     }
     .finished.animate.revealed .pillar {
@@ -728,17 +770,17 @@
 
     .finished .also-rans {
       width: 100%; max-width: 720px;
-      padding: clamp(8px, 1.2vh, 12px) clamp(16px, 2.2vw, 24px);
+      padding: clamp(5px, 0.8vh, 10px) clamp(14px, 2vw, 22px);
       background: var(--paper);
       border: 4px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow-md);
     }
     .finished .also-rans .row {
-      display: flex; align-items: center; gap: clamp(12px, 1.4vw, 18px);
-      padding: clamp(5px, 0.8vh, 10px) 8px;
+      display: flex; align-items: center; gap: clamp(10px, 1.2vw, 16px);
+      padding: clamp(3px, 0.5vh, 7px) 8px;
       border-bottom: 2px dashed var(--ink);
-      font-size: clamp(13px, min(1.3vw, 1.9vh), 19px);
+      font-size: clamp(13px, min(1.3vw, 1.7vh), 18px);
     }
     .finished .also-rans .row:last-child { border-bottom: none; }
     .finished .also-rans .row .pos {
@@ -1104,13 +1146,23 @@
         empty.textContent = 'No players yet.';
         lbEl.appendChild(empty);
       } else {
+        // Stage J: score-bars leaderboard. Bar width is % relative to top score.
+        // Top-3 get rank class .r1/.r2/.r3 for colored backgrounds, plus .blurred
+        // for the name-blur effect (preserved from original spec).
+        const topScore = (list[0] && list[0].score) || 1;
         list.forEach((p, i) => {
           const row = document.createElement('div');
-          row.className = 'leader-row' + (i < 3 ? ' blurred' : '');
+          const rankCls = i < 3 ? ' r' + (i + 1) : '';
+          row.className = 'leader-row' + rankCls + (i < 3 ? ' blurred' : '');
+          const score = p.score || 0;
+          const pct = Math.max(0, Math.min(100, Math.round((score / topScore) * 100)));
           row.innerHTML =
             `<span class="pos">${i + 1}</span>` +
-            `<span class="name">${escapeHtml(displayName(p))}</span>` +
-            `<span class="pts">${(p.score || 0).toLocaleString()}</span>`;
+            `<div class="mid">` +
+              `<span class="name">${escapeHtml(displayName(p))}</span>` +
+              `<div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>` +
+            `</div>` +
+            `<span class="pts">${score.toLocaleString()}</span>`;
           lbEl.appendChild(row);
         });
       }
