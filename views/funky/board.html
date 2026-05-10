@@ -423,6 +423,50 @@
       position: relative;
       min-height: 0;
     }
+    /* Stage I.1: options legend below the chart. X-axis now shows just
+       letters (A/B/C/D) at large size; full option text appears here in
+       a 2x2 grid so long answers like "Can you see my screen?" don't
+       force Chart.js to rotate/skew the x-axis labels. */
+    .reveal .chart-side .options-key {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .reveal .chart-side .options-key .key-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px;
+      background: #fff;
+      border: 3px solid var(--ink);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
+      font-size: clamp(13px, min(1.2vw, 1.7vh), 18px);
+      font-weight: 600;
+      min-width: 0;
+      line-height: 1.25;
+    }
+    .reveal .chart-side .options-key .key-row .letter {
+      flex: 0 0 26px; height: 26px; border-radius: 50%;
+      background: var(--ink); color: var(--paper);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+      margin-top: 1px;
+    }
+    .reveal .chart-side .options-key .key-row .text {
+      flex: 1;
+      color: var(--ink);
+      white-space: normal;
+      word-break: break-word;
+    }
+    .reveal .chart-side .options-key .key-row.correct {
+      background: var(--mint);
+    }
+    .reveal .chart-side .options-key .key-row.correct .text::after {
+      content: " ✓";
+      font-weight: 700;
+      color: var(--purple-dark);
+    }
+
     .reveal .leader-side {
       display: flex; flex-direction: column;
       background: var(--paper);
@@ -801,6 +845,7 @@
         <div class="chart-wrap">
           <canvas id="reveal-chart"></canvas>
         </div>
+        <div class="options-key" id="options-key"></div>
       </div>
       <div class="leader-side">
         <h3>Top 10 — Live</h3>
@@ -985,7 +1030,8 @@
       const greenColor = styles.getPropertyValue('--green').trim() || '#4ef2c6';
       const redColor   = styles.getPropertyValue('--red').trim()   || '#ff5c7a';
       const letters = ['A', 'B', 'C', 'D'];
-      const labels = letters.map((L, i) => `${L}. ${(r.options && r.options[i]) || ''}`);
+      // Stage I.1: x-axis shows just letters; full text in legend below.
+      const labels = letters.slice();
       const colors = labels.map((_, i) => i === r.correctOption ? greenColor : redColor);
 
       destroyRevealChart();
@@ -1012,7 +1058,10 @@
             x: {
               ticks: {
                 color: '#141018',
-                font: { family: 'Fredoka', weight: '700', size: 18 },
+                font: { family: 'Fredoka', weight: '700', size: 32 },
+                maxRotation: 0,
+                minRotation: 0,
+                padding: 6,
               },
               grid: { display: false },
             },
@@ -1029,7 +1078,19 @@
         },
       });
 
-      const lb = r.leaderboard || [];
+      // Stage I.1: render options legend below chart with full text.
+      const keyEl = document.getElementById('options-key');
+      keyEl.innerHTML = '';
+      (r.options || []).forEach((opt, i) => {
+        const row = document.createElement('div');
+        row.className = 'key-row' + (i === r.correctOption ? ' correct' : '');
+        row.innerHTML =
+          `<span class="letter">${letters[i]}</span>` +
+          `<span class="text">${escapeHtml(opt)}</span>`;
+        keyEl.appendChild(row);
+      });
+
+            const lb = r.leaderboard || [];
       const lbEl = document.getElementById('leader-rows');
       lbEl.innerHTML = '';
       const list = lb.slice(0, 10);
