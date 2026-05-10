@@ -13,12 +13,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     /* ============================================================
-       Funky / neobrutalist theme — Stage F.
+       Funky / neobrutalist theme — Stage I.
        Light pastel gradient bg, paper panels with thick ink borders,
        hard offset shadows, colored answer tiles. Big screen / projector.
        --green and --red are remapped to mint and coral so the
        Chart.js bars (which read these CSS vars) match the theme
        without JS changes.
+
+       Stage I: viewport-aware sizing. clamp() values that previously
+       used only `vw` now use `min(Xvw, Yvh)` so font-size and padding
+       downscale on shorter viewports (e.g. 1366x768, 1024x768). 100vh
+       → 100dvh on body to handle browser-chrome fluctuation. .stage
+       padding now uses vh-relative top/bottom so headroom shrinks on
+       short displays without affecting 1920x1080 projector visuals.
        ============================================================ */
     :root {
       --purple: #7b2fff;
@@ -49,7 +56,7 @@
 
     html, body {
       margin: 0; padding: 0;
-      height: 100vh; overflow: hidden;
+      height: 100dvh; overflow: hidden;
       font-family: var(--font);
       color: var(--ink);
       font-feature-settings: "ss01";
@@ -65,7 +72,7 @@
     /* ---------- Topbar ---------- */
     .topbar {
       position: absolute; top: 0; left: 0; right: 0;
-      padding: 22px 36px;
+      padding: clamp(14px, 2vh, 22px) clamp(20px, 2.8vw, 36px);
       display: flex; align-items: center; gap: 16px;
       z-index: 10;
     }
@@ -92,10 +99,14 @@
     }
     .topbar .meta:empty { display: none; }
 
-    /* ---------- Stage container ---------- */
+    /* ---------- Stage container ----------
+       Stage I: padding now scales with viewport. Top floors at 72px so it
+       always clears the absolute-positioned topbar (~70px tall). On tall
+       screens it stays at 100px (current behaviour). On short screens it
+       compresses to give content more room. */
     .stage {
       position: absolute; inset: 0;
-      padding: 100px 60px 60px;
+      padding: clamp(72px, 9vh, 100px) clamp(28px, 3.5vw, 60px) clamp(32px, 5vh, 60px);
       display: flex; flex-direction: column;
     }
 
@@ -104,7 +115,7 @@
       flex: 1;
       display: grid;
       grid-template-columns: 1.2fr 0.8fr;
-      gap: 60px;
+      gap: clamp(28px, 4vw, 60px);
       align-items: center;
     }
     .lobby .left .kicker {
@@ -119,8 +130,8 @@
       text-transform: uppercase;
     }
     .lobby .left h2 {
-      margin: 24px 0 32px;
-      font-size: clamp(60px, 8vw, 128px);
+      margin: clamp(16px, 2vh, 24px) 0 clamp(20px, 3vh, 32px);
+      font-size: clamp(44px, min(8vw, 13vh), 116px);
       font-weight: 700;
       line-height: 0.95;
       letter-spacing: -0.02em;
@@ -128,11 +139,11 @@
     }
     .lobby .left .url {
       display: inline-block;
-      padding: 16px 26px;
+      padding: clamp(10px, 1.5vh, 16px) clamp(16px, 2vw, 26px);
       background: var(--paper);
       border: 4px solid var(--ink);
       border-radius: var(--radius-sm);
-      font-size: clamp(20px, 1.8vw, 30px);
+      font-size: clamp(16px, min(1.8vw, 2.5vh), 28px);
       font-weight: 600;
       color: var(--ink);
       letter-spacing: -0.01em;
@@ -140,17 +151,18 @@
       font-family: ui-monospace, 'JetBrains Mono', monospace;
     }
     .lobby .right {
-      display: flex; flex-direction: column; align-items: center; gap: 36px;
+      display: flex; flex-direction: column; align-items: center;
+      gap: clamp(20px, 3vh, 36px);
     }
     /* QR card — white inside thick ink border. Library is qrcodejs (NOT
        npm 'qrcode') — DO NOT CHANGE. See known bug #3. */
     .lobby .qr-wrap {
-      width: clamp(220px, 30vw, 380px);
+      width: clamp(180px, min(28vw, 42vh), 360px);
       aspect-ratio: 1 / 1;
       background: #fff;
       border: 4px solid var(--ink);
       border-radius: var(--radius);
-      padding: 18px;
+      padding: clamp(12px, 1.6vh, 18px);
       display: flex; align-items: center; justify-content: center;
       box-shadow: var(--shadow);
     }
@@ -165,7 +177,7 @@
     }
     .lobby .player-counter {
       text-align: center;
-      padding: 18px 32px;
+      padding: clamp(12px, 1.8vh, 18px) clamp(20px, 2.5vw, 32px);
       background: var(--paper);
       border: 4px solid var(--ink);
       border-radius: var(--radius);
@@ -176,7 +188,7 @@
       text-transform: uppercase; letter-spacing: 0.12em;
     }
     .lobby .player-counter .num {
-      font-size: clamp(64px, 8vw, 128px);
+      font-size: clamp(48px, min(8vw, 12vh), 110px);
       font-weight: 700;
       line-height: 1;
       font-variant-numeric: tabular-nums;
@@ -186,7 +198,7 @@
     /* Big PIN — yellow gradient with 4px dashed ink border, lifted by hard
        shadow. Most prominent thing on the lobby screen. */
     .lobby .left .code-display {
-      margin-top: 36px;
+      margin-top: clamp(20px, 3vh, 36px);
       display: flex; flex-direction: column; gap: 12px;
     }
     .lobby .left .code-label {
@@ -196,11 +208,11 @@
     }
     .lobby .left .code-value {
       display: inline-block;
-      padding: 12px 36px;
+      padding: clamp(8px, 1.2vh, 12px) clamp(20px, 2.8vw, 36px);
       background: linear-gradient(135deg, var(--yellow), #fff8b0);
       border: 4px dashed var(--ink);
       border-radius: var(--radius);
-      font-size: clamp(72px, 9vw, 132px);
+      font-size: clamp(52px, min(9vw, 13vh), 120px);
       font-weight: 700;
       line-height: 1;
       letter-spacing: 0.16em;
@@ -215,7 +227,7 @@
       flex: 1;
       display: flex; flex-direction: column;
       justify-content: center; align-items: center;
-      gap: 36px; padding: 40px;
+      gap: clamp(20px, 3vh, 36px); padding: clamp(20px, 3vh, 40px);
       text-align: center;
     }
     .preview .preview-label {
@@ -230,12 +242,12 @@
     }
     .preview .preview-q-text {
       margin: 0;
-      padding: 32px 56px;
+      padding: clamp(20px, 3vh, 32px) clamp(28px, 4vw, 56px);
       background: var(--paper);
       border: 5px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      font-size: clamp(48px, 6.5vw, 116px);
+      font-size: clamp(36px, min(6vw, 11vh), 100px);
       font-weight: 700;
       line-height: 1.05;
       letter-spacing: -0.02em;
@@ -256,7 +268,7 @@
       flex: 1;
       display: grid;
       grid-template-rows: auto auto 1fr auto;
-      gap: 24px;
+      gap: clamp(14px, 2vh, 24px);
     }
     .question .qmeta {
       display: inline-flex; align-items: center; gap: 14px;
@@ -282,12 +294,12 @@
     }
     .question h2.q-text {
       margin: 0;
-      padding: 24px 36px;
+      padding: clamp(16px, 2.2vh, 24px) clamp(20px, 2.8vw, 36px);
       background: var(--paper);
       border: 5px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      font-size: clamp(36px, 4.6vw, 88px);
+      font-size: clamp(28px, min(4.6vw, 8vh), 78px);
       font-weight: 700;
       line-height: 1.1;
       letter-spacing: -0.02em;
@@ -296,20 +308,20 @@
     .question .opts {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 18px;
+      gap: clamp(12px, 1.4vw, 18px);
     }
     /* Colored answer tiles — yellow / mint / purple / coral, matching the
        quizzy palette. JS sets each option to class="opt"; nth-child gives
        the four colors without any JS change. */
     .question .opt {
-      display: flex; align-items: center; gap: 22px;
-      padding: 22px 28px;
+      display: flex; align-items: center; gap: clamp(14px, 1.8vw, 22px);
+      padding: clamp(14px, 2vh, 22px) clamp(18px, 2.2vw, 28px);
       background: var(--yellow);
       color: var(--ink);
       border: 4px solid var(--ink);
       border-radius: var(--radius-sm);
       box-shadow: var(--shadow-md);
-      font-size: clamp(22px, 2.2vw, 36px);
+      font-size: clamp(18px, min(2.2vw, 3.5vh), 32px);
       font-weight: 700;
       line-height: 1.2;
     }
@@ -318,11 +330,14 @@
     .question .opt:nth-child(3) { background: var(--purple); color: var(--paper); }
     .question .opt:nth-child(4) { background: var(--coral);  color: var(--paper); }
     .question .opt .letter {
-      flex: 0 0 56px; height: 56px; border-radius: 50%;
+      flex: 0 0 clamp(40px, min(4vw, 6vh), 56px);
+      height: clamp(40px, min(4vw, 6vh), 56px);
+      border-radius: 50%;
       background: var(--ink); color: var(--paper);
       border: 3px solid var(--ink);
       display: inline-flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 22px;
+      font-weight: 700;
+      font-size: clamp(16px, min(1.6vw, 2.4vh), 22px);
     }
     .question .opt:nth-child(3) .letter,
     .question .opt:nth-child(4) .letter {
@@ -330,16 +345,16 @@
     }
     .question .footer {
       display: flex; justify-content: space-between; align-items: end;
-      gap: 32px;
+      gap: clamp(18px, 2.5vw, 32px);
     }
     .question .answers, .question .timer-block {
       display: flex; flex-direction: column;
-      padding: 18px 26px;
+      padding: clamp(12px, 1.6vh, 18px) clamp(16px, 2vw, 26px);
       background: var(--paper);
       border: 4px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow-md);
-      min-width: 280px;
+      min-width: clamp(180px, 18vw, 280px);
     }
     .question .timer-block { text-align: right; }
     .question .label {
@@ -348,7 +363,7 @@
       margin-bottom: 4px; opacity: 0.7;
     }
     .question .big-num {
-      font-size: clamp(56px, 6.5vw, 104px);
+      font-size: clamp(40px, min(6.5vw, 10vh), 92px);
       font-weight: 700; line-height: 1;
       font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
       color: var(--ink);
@@ -369,14 +384,14 @@
       flex: 1;
       display: grid;
       grid-template-columns: 1.4fr 1fr;
-      gap: 32px;
+      gap: clamp(20px, 2.5vw, 32px);
     }
     .reveal .chart-side {
       display: flex; flex-direction: column;
       background: var(--paper);
       border: 4px solid var(--ink);
       border-radius: var(--radius);
-      padding: 32px;
+      padding: clamp(20px, 2.8vh, 32px);
       box-shadow: var(--shadow);
     }
     .reveal .chart-side .q-text {
@@ -413,7 +428,7 @@
       background: var(--paper);
       border: 4px solid var(--ink);
       border-radius: var(--radius);
-      padding: 32px;
+      padding: clamp(20px, 2.8vh, 32px);
       box-shadow: var(--shadow);
       overflow-y: auto;
     }
@@ -509,13 +524,13 @@
 
     /* PHASE A — final standings list */
     .finished .standard-title {
-      margin: 0 0 32px;
-      padding: 18px 48px;
+      margin: 0 0 clamp(20px, 3vh, 32px);
+      padding: clamp(12px, 1.8vh, 18px) clamp(28px, 4vw, 48px);
       background: linear-gradient(135deg, var(--yellow), #fff8b0);
       border: 5px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      font-size: clamp(48px, 6vw, 96px);
+      font-size: clamp(36px, min(6vw, 9vh), 86px);
       font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--ink);
@@ -524,11 +539,11 @@
     .finished .top-10-list {
       width: 100%;
       max-width: 880px;
-      margin-bottom: 28px;
+      margin-bottom: clamp(16px, 2.5vh, 28px);
     }
     .finished .top-10-list .row {
       display: flex; align-items: center; gap: 18px;
-      padding: 14px 24px;
+      padding: clamp(10px, 1.4vh, 14px) clamp(16px, 2.2vw, 24px);
       border: 3px solid var(--ink);
       border-radius: var(--radius-sm);
       margin-bottom: 8px;
@@ -539,11 +554,11 @@
       flex: 0 0 60px;
       font-weight: 700; color: var(--ink); opacity: 0.55;
       font-variant-numeric: tabular-nums;
-      font-size: clamp(18px, 1.6vw, 26px);
+      font-size: clamp(16px, min(1.6vw, 2.2vh), 24px);
     }
     .finished .top-10-list .row .name {
       flex: 1;
-      font-size: clamp(18px, 1.8vw, 28px);
+      font-size: clamp(16px, min(1.8vw, 2.4vh), 26px);
       font-weight: 700;
       color: var(--ink);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -556,17 +571,17 @@
     .finished .top-10-list .row .pts {
       font-variant-numeric: tabular-nums;
       font-weight: 700;
-      font-size: clamp(20px, 1.8vw, 30px);
+      font-size: clamp(16px, min(1.8vw, 2.4vh), 28px);
       color: var(--purple-dark);
     }
     .finished .thanks-msg {
       margin-top: 16px;
-      padding: 16px 36px;
+      padding: clamp(12px, 1.6vh, 16px) clamp(20px, 2.8vw, 36px);
       background: var(--mint);
       border: 4px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow-md);
-      font-size: clamp(28px, 3vw, 52px);
+      font-size: clamp(20px, min(3vw, 4vh), 46px);
       font-weight: 700;
       text-align: center;
       letter-spacing: -0.01em;
@@ -575,19 +590,19 @@
     .finished .top-10-list .empty {
       padding: 36px 0;
       color: var(--ink); opacity: 0.55; font-style: italic;
-      font-size: clamp(18px, 1.6vw, 24px);
+      font-size: clamp(16px, 1.6vw, 22px);
       text-align: center;
     }
 
     /* PHASE B — celebration */
     .finished .celebration-title {
-      margin: 0 0 48px;
-      padding: 20px 56px;
+      margin: 0 0 clamp(28px, 4vh, 48px);
+      padding: clamp(14px, 2vh, 20px) clamp(32px, 4.5vw, 56px);
       background: linear-gradient(135deg, var(--gold) 0%, var(--gold-warm) 100%);
       border: 5px solid var(--ink);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      font-size: clamp(54px, 7vw, 120px);
+      font-size: clamp(40px, min(7vw, 11vh), 108px);
       font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--ink);
@@ -605,15 +620,16 @@
     .finished .podium {
       display: grid;
       grid-template-columns: 1fr 1.2fr 1fr;
-      gap: 28px;
+      gap: clamp(16px, 2vw, 28px);
       align-items: end;
       width: 100%;
       max-width: 1100px;
-      margin-bottom: 48px;
+      margin-bottom: clamp(28px, 4vh, 48px);
     }
     .finished .pillar {
-      display: flex; flex-direction: column; align-items: center; gap: 14px;
-      padding: 32px 22px;
+      display: flex; flex-direction: column; align-items: center;
+      gap: clamp(8px, 1.2vh, 14px);
+      padding: clamp(18px, 2.6vh, 32px) clamp(14px, 2vw, 22px);
       background: var(--paper);
       border: 5px solid var(--ink);
       border-radius: var(--radius) var(--radius) 0 0;
@@ -621,33 +637,34 @@
       text-align: center;
     }
     .finished .pillar .medal {
-      font-size: clamp(48px, 5vw, 72px); line-height: 1; margin-bottom: 6px;
+      font-size: clamp(36px, min(5vw, 7vh), 64px);
+      line-height: 1; margin-bottom: 6px;
       filter: drop-shadow(3px 3px 0 var(--ink));
     }
     .finished .pillar .name {
-      font-size: clamp(20px, 1.8vw, 30px);
+      font-size: clamp(16px, min(1.8vw, 2.6vh), 28px);
       font-weight: 700;
       color: var(--ink);
       max-width: 100%;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .finished .pillar .score {
-      font-size: clamp(32px, 3.2vw, 56px);
+      font-size: clamp(24px, min(3.2vw, 4.6vh), 50px);
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       color: var(--purple-dark);
     }
     .finished .pillar.gold {
-      padding-bottom: 72px;
+      padding-bottom: clamp(48px, 6.5vh, 72px);
       background: linear-gradient(180deg, var(--gold) 0%, #fff8b0 100%);
       box-shadow: 8px 8px 0 var(--ink), 0 0 60px rgba(255, 215, 0, 0.45);
     }
     .finished .pillar.silver {
-      padding-bottom: 44px;
+      padding-bottom: clamp(28px, 4vh, 44px);
       background: linear-gradient(180deg, #e8e8e8 0%, #f8f8f8 100%);
     }
     .finished .pillar.bronze {
-      padding-bottom: 28px;
+      padding-bottom: clamp(18px, 3vh, 28px);
       background: linear-gradient(180deg, #e8a168 0%, #f4cba0 100%);
     }
     .finished.animate.revealed .pillar {
@@ -663,7 +680,7 @@
 
     .finished .also-rans {
       width: 100%; max-width: 720px;
-      padding: 12px 24px;
+      padding: clamp(8px, 1.2vh, 12px) clamp(16px, 2.2vw, 24px);
       background: var(--paper);
       border: 4px solid var(--ink);
       border-radius: var(--radius);
@@ -671,9 +688,9 @@
     }
     .finished .also-rans .row {
       display: flex; align-items: center; gap: 18px;
-      padding: 12px 8px;
+      padding: clamp(8px, 1.2vh, 12px) 8px;
       border-bottom: 2px dashed var(--ink);
-      font-size: clamp(16px, 1.4vw, 22px);
+      font-size: clamp(14px, min(1.4vw, 2vh), 20px);
     }
     .finished .also-rans .row:last-child { border-bottom: none; }
     .finished .also-rans .row .pos {

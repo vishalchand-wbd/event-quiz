@@ -12,6 +12,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
+    /* Stage I: mobile-responsive layout (≤640px). Stats grid stacks
+       single column, action buttons stack full-width with 48px min
+       tap height, q-display options stay 2x2 but smaller. Clean
+       theme uses subtle box-shadows (not hard offsets), so no
+       aggressive shadow scaling needed on mobile. */
     :root {
       --brand: #0064FF;
       --brand-dark: #0050D0;
@@ -288,6 +293,87 @@
     }
 
     .hidden { display: none !important; }
+
+    /* ============================================================
+       Stage I — Mobile breakpoint (≤640px).
+       Stacks layout into a single column, ensures all action
+       buttons hit min 48px tap height, drops font sizes for stats
+       and question display so they don't dominate a stacked layout.
+       ============================================================ */
+    @media (max-width: 640px) {
+      .topbar { padding: 12px 16px; gap: 10px; flex-wrap: wrap; }
+      .topbar .logo { height: 26px; }
+      .topbar h1 { font-size: 14px; letter-spacing: 0.06em; }
+      .topbar .label { padding: 2px 6px; font-size: 10px; margin-left: 0; }
+      .topbar .conn-status { font-size: 12px; }
+      /* Adjust the offline-state negative-margin trick to match the smaller
+         mobile padding so the red bleed reaches the card edges cleanly. */
+      .topbar .conn-status.offline { margin: -12px -16px -12px auto; padding: 12px 16px; }
+
+      main { padding: 16px 12px 24px; }
+
+      .card { padding: 18px 16px; margin-bottom: 14px; border-radius: 12px; }
+      .card h2 { font-size: 19px; }
+      .card .sub { font-size: 13px; margin-bottom: 16px; }
+
+      /* Game Console header row — clean's inline style doesn't have
+         flex-wrap, so force it on mobile so heading + meta stack. */
+      #view-game > div:first-child {
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px !important;
+      }
+      .header-meta {
+        align-items: flex-start;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .stat { padding: 12px 14px; }
+      .stat .value { font-size: 26px; }
+      .stat .value.large { font-size: 30px; }
+
+      .q-display {
+        padding: 14px 16px;
+        margin-bottom: 16px;
+      }
+      .q-display .q-text { font-size: 17px; margin: 0 0 14px; line-height: 1.25; }
+      .q-display .opts { gap: 8px; }
+      .q-display .opt { padding: 10px 12px; font-size: 13px; gap: 8px; }
+      .q-display .opt .letter { flex: 0 0 22px; height: 22px; font-size: 11px; }
+
+      .reveal-leaderboard { margin-top: 14px; }
+      .reveal-leaderboard h3 { font-size: 12px; margin: 0 0 8px; }
+      .reveal-leaderboard .row { padding: 8px 0; gap: 10px; }
+      .reveal-leaderboard .pos { width: 26px; height: 26px; font-size: 12px; }
+      .reveal-leaderboard .name { font-size: 14px; }
+      .reveal-leaderboard .pts { font-size: 14px; }
+
+      .actions {
+        gap: 10px;
+        padding-top: 16px;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .actions .btn {
+        min-width: 0;
+        width: 100%;
+        min-height: 48px;
+        padding: 14px 18px;
+        font-size: 15px;
+      }
+      .actions .spacer { display: none; }
+
+      .token-form input { font-size: 16px; padding: 12px 14px; }
+
+      .toast { bottom: 16px; padding: 10px 16px; font-size: 13px; }
+    }
   </style>
 </head>
 <body>

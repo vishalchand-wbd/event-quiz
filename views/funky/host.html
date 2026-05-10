@@ -13,10 +13,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     /* ============================================================
-       Funky / neobrutalist theme — Stage F.
+       Funky / neobrutalist theme — Stage I.
        Same tokens as /play and /board. Host console has more
        structural elements (stats cards, badges, action buttons,
        leaderboard) — all neobrutalist-styled with hard shadows.
+
+       Stage I: mobile-responsive layout (≤640px). Stats grid stacks
+       single column, action buttons stack full-width with 48px min
+       tap height, hard shadows scale down so they don't push past
+       the viewport edge, q-display options stay 2x2 but smaller.
        ============================================================ */
     :root {
       --purple: #7b2fff;
@@ -365,6 +370,106 @@
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     .hidden { display: none !important; }
+
+    /* ============================================================
+       Stage I — Mobile breakpoint (≤640px).
+       Stacks layout into a single column, scales hard offset shadows
+       down (4px instead of 6px) so neobrutalist border + shadow stack
+       doesn't push past the viewport edge, and ensures all action
+       buttons hit min 48px tap height.
+       ============================================================ */
+    @media (max-width: 640px) {
+      :root {
+        --shadow: 4px 4px 0 var(--ink);
+        --shadow-sm: 3px 3px 0 var(--ink);
+        --shadow-xs: 2px 2px 0 var(--ink);
+      }
+
+      .topbar {
+        padding: 12px 14px; gap: 8px;
+        flex-wrap: wrap;
+      }
+      .topbar .logo { height: 28px; }
+      .topbar h1 { font-size: 16px; }
+      .topbar .label { padding: 3px 8px; font-size: 11px; }
+      .topbar .conn-status { padding: 4px 10px; font-size: 12px; }
+
+      main { padding: 6px 14px 24px; }
+
+      .card { padding: 18px 16px; margin-bottom: 16px; border-width: 3px; }
+      .card h2 { font-size: 19px; }
+      .card .sub { font-size: 13px; margin-bottom: 16px; }
+
+      /* Game Console header row stacks. The inline-styled flex container
+         already has flex-wrap; we just constrain header-meta to wrap as a
+         row on mobile so badge + room-code sit on one line. */
+      .header-meta {
+        align-items: flex-start;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .stat { padding: 12px 14px; border-width: 2px; }
+      .stat .value { font-size: 26px; }
+      .stat .value.large { font-size: 30px; }
+
+      .q-display {
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        border-width: 2px;
+      }
+      .q-display .q-meta {
+        font-size: 10px; padding: 3px 8px; margin-bottom: 10px;
+      }
+      .q-display .q-text { font-size: 17px; margin: 0 0 14px; line-height: 1.25; }
+      .q-display .opts { gap: 8px; }
+      .q-display .opt {
+        padding: 10px 12px; font-size: 13px;
+        border-width: 2px;
+      }
+      .q-display .opt .letter { flex: 0 0 22px; height: 22px; font-size: 11px; }
+
+      .reveal-leaderboard {
+        padding: 14px 16px; margin-top: 14px;
+        border-width: 2px;
+      }
+      .reveal-leaderboard h3 { font-size: 11px; margin: 0 0 10px; }
+      .reveal-leaderboard .row { padding: 8px 0; gap: 10px; }
+      .reveal-leaderboard .pos { width: 26px; height: 26px; font-size: 12px; }
+      .reveal-leaderboard .name { font-size: 14px; }
+      .reveal-leaderboard .pts { font-size: 14px; }
+
+      .actions {
+        gap: 10px;
+        padding-top: 16px;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .actions .btn {
+        min-width: 0;
+        width: 100%;
+        min-height: 48px;
+        padding: 14px 18px;
+        font-size: 15px;
+        border-width: 3px;
+      }
+      .actions .spacer { display: none; }
+
+      .token-form input {
+        font-size: 16px;
+        padding: 12px 14px;
+        border-width: 2px;
+      }
+      .btn { border-width: 3px; }
+
+      .toast { bottom: 16px; padding: 10px 16px; font-size: 13px; }
+    }
   </style>
 </head>
 <body>
