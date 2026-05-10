@@ -1,17 +1,21 @@
 name: Deploy to VM
-
 # Push to main = auto-deploy production.
 # Push to redesign does NOT auto-deploy — use workflow_dispatch to test redesign
 # on the VM only when you mean to. Keeps work-in-progress out of the live demo.
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Branch or tag to deploy (default: main)'
-        required: true
-        default: 'main'
+        # Empty default + required:false means: if you don't pass -f ref=...,
+        # the checkout falls through to github.ref (which respects --ref).
+        # Previously default was 'main', which caused workflow_dispatch to
+        # silently deploy main even when --ref polish was given. Don't undo.
+        description: 'Branch or tag to deploy (leave empty to use --ref / pushed branch)'
+        required: false
+        default: ''
 
 # Don't let two deploys race each other if you push twice in quick succession.
 # Queue them; let each finish.
@@ -22,12 +26,13 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # For workflow_dispatch, deploy whatever branch was selected.
+          # For workflow_dispatch with -f ref=..., deploy whatever was passed.
+          # For workflow_dispatch without -f ref=..., fall through to github.ref
+          # (which is set by --ref polish or similar).
           # For push, deploy the pushed ref (main).
           ref: ${{ github.event.inputs.ref || github.ref }}
 
