@@ -3,32 +3,20 @@
   "questions": [
     {
       "text": "When was the HCC office (Capitaland) opened in Hyderabad?",
-      "options": ["Sep 2022", "Sep 2023", "Oct 2022", "Nov 2023"],
-      "correctOption": 1,
-      "durationMs": 10000
-    },
-    {
-      "text": "What is the name of Batman's city?",
-      "options": ["Metropolis", "Gotham City", "Star City", "Central City"],
-      "correctOption": 1,
+      "options": ["Sep 2022", "Oct 2022", "Sep 2023", "Nov 2023"],
+      "correctOption": 2,
       "durationMs": 10000
     },
     {
       "text": "How many Oscars did the legendary The Dark Knight (2008) movie win?",
-      "options": ["1", "2", "3", "None"],
-      "correctOption": 1,
-      "durationMs": 10000
-    },
-    {
-      "text": "Who is Superman's alter ego?",
-      "options": ["Bruce Wayne", "Clark Kent", "Tony Stark", "Peter Parker"],
+      "options": ["1", "2", "3", "4"],
       "correctOption": 1,
       "durationMs": 10000
     },
     {
       "text": "What is the name of Harry Potter's school?",
-      "options": ["Durmstrang", "Hogwarts", "Beauxbatons", "Avalon"],
-      "correctOption": 1,
+      "options": ["Hogwarts", "Durmstrang", "Beauxbatons", "Avalon"],
+      "correctOption": 0,
       "durationMs": 10000
     },
     {
@@ -39,38 +27,32 @@
     },
     {
       "text": "Which animated duo is always chasing each other?",
-      "options": ["Scooby & Shaggy", "Tom & Jerry", "Bugs & Daffy", "Rick & Morty"],
-      "correctOption": 1,
+      "options": ["Scooby & Shaggy", "Bugs & Daffy", "Rick & Morty", "Tom & Jerry"],
+      "correctOption": 3,
       "durationMs": 10000
     },
     {
       "text": "What's the name of the newest series from the world of Game of Thrones?",
-      "options": ["Dragon World", "Song of Ice and Fire", "A Knight of the Seven Kingdoms", "House of the Dragon"],
-      "correctOption": 2,
-      "durationMs": 10000
-    },
-    {
-      "text": "What is the real name of Batman?",
-      "options": ["Clark Kent", "Bruce Wayne", "Barry Allen", "Arthur Curry"],
+      "options": ["Dragon World", "A Knight of the Seven Kingdoms", "Song of Ice and Fire", "House of the Dragon"],
       "correctOption": 1,
       "durationMs": 10000
     },
     {
-      "text": "What is the name of Aquaman's kingdom?",
-      "options": ["Asgard", "Wakanda", "Atlantis", "Themyscira"],
+      "text": "What is the real name of Batman?",
+      "options": ["Clark Kent", "Barry Allen", "Bruce Wayne", "Arthur Curry"],
       "correctOption": 2,
+      "durationMs": 10000
+    },
+    {
+      "text": "What is the name of Aquaman's kingdom?",
+      "options": ["Asgard", "Wakanda", "Themyscira", "Atlantis"],
+      "correctOption": 3,
       "durationMs": 10000
     },
     {
       "text": "Which famous WBD horror movie figure makes a quick cameo appearance in the Aquaman film?",
-      "options": ["Chucky", "M3GAN", "Annabelle", "Slappy"],
-      "correctOption": 2,
-      "durationMs": 10000
-    },
-    {
-      "text": "Which iconic coffee shop serves as the main hangout spot in Friends?",
-      "options": ["Java House", "Central Café", "Central Perk", "Coffee Bean"],
-      "correctOption": 2,
+      "options": ["Annabelle", "Chucky", "M3GAN", "Slappy"],
+      "correctOption": 0,
       "durationMs": 10000
     },
     {
