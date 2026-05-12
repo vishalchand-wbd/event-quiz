@@ -2,40 +2,82 @@
   "title": "Office Inauguration Quiz",
   "questions": [
     {
-      "text": "Which animal has three hearts?",
-      "options": ["Octopus", "Shark", "Blue Whale", "Crocodile"],
-      "correctOption": 0,
-      "durationMs": 20000
-    },
-    {
-      "text": "What is the only food that never spoils naturally?",
-      "options": ["Salt", "Honey", "Rice", "Sugar"],
+      "text": "When was the HCC office (Capitaland) opened in Hyderabad?",
+      "options": ["Sep 2022", "Sep 2023", "Oct 2022", "Nov 2023"],
       "correctOption": 1,
-      "durationMs": 20000
+      "durationMs": 10000
     },
     {
-      "text": "Which country has a time zone that is 45 minutes offset from UTC?",
-      "options": ["India", "Nepal", "China", "Australia"],
+      "text": "What is the name of Batman's city?",
+      "options": ["Metropolis", "Gotham City", "Star City", "Central City"],
       "correctOption": 1,
-      "durationMs": 20000
+      "durationMs": 10000
     },
     {
-      "text": "Warner Bros. Pictures was founded in which year?",
-      "options": ["1913", "1923", "1933", "1943"],
+      "text": "How many Oscars did the legendary The Dark Knight (2008) movie win?",
+      "options": ["1", "2", "3", "None"],
       "correctOption": 1,
-      "durationMs": 20000
+      "durationMs": 10000
     },
     {
-      "text": "Which planet has the shortest day in our solar system?",
-      "options": ["Earth", "Mars", "Jupiter", "Saturn"],
+      "text": "Who is Superman's alter ego?",
+      "options": ["Bruce Wayne", "Clark Kent", "Tony Stark", "Peter Parker"],
+      "correctOption": 1,
+      "durationMs": 10000
+    },
+    {
+      "text": "What is the name of Harry Potter's school?",
+      "options": ["Durmstrang", "Hogwarts", "Beauxbatons", "Avalon"],
+      "correctOption": 1,
+      "durationMs": 10000
+    },
+    {
+      "text": "When was the first Harry Potter movie released worldwide?",
+      "options": ["September 16, 2001", "November 4, 2001", "November 16, 2001", "December 4, 2001"],
       "correctOption": 2,
-      "durationMs": 20000
+      "durationMs": 10000
     },
     {
-      "text": "Fun Question: What is the most common phrase in online meetings?",
-      "options": ["You're on mute", "Let's circle back", "Can you see my screen?", "All of the above"],
-      "correctOption": 3,
-      "durationMs": 20000
+      "text": "Which animated duo is always chasing each other?",
+      "options": ["Scooby & Shaggy", "Tom & Jerry", "Bugs & Daffy", "Rick & Morty"],
+      "correctOption": 1,
+      "durationMs": 10000
+    },
+    {
+      "text": "What's the name of the newest series from the world of Game of Thrones?",
+      "options": ["Dragon World", "Song of Ice and Fire", "A Knight of the Seven Kingdoms", "House of the Dragon"],
+      "correctOption": 2,
+      "durationMs": 10000
+    },
+    {
+      "text": "What is the real name of Batman?",
+      "options": ["Clark Kent", "Bruce Wayne", "Barry Allen", "Arthur Curry"],
+      "correctOption": 1,
+      "durationMs": 10000
+    },
+    {
+      "text": "What is the name of Aquaman's kingdom?",
+      "options": ["Asgard", "Wakanda", "Atlantis", "Themyscira"],
+      "correctOption": 2,
+      "durationMs": 10000
+    },
+    {
+      "text": "Which famous WBD horror movie figure makes a quick cameo appearance in the Aquaman film?",
+      "options": ["Chucky", "M3GAN", "Annabelle", "Slappy"],
+      "correctOption": 2,
+      "durationMs": 10000
+    },
+    {
+      "text": "Which iconic coffee shop serves as the main hangout spot in Friends?",
+      "options": ["Java House", "Central Café", "Central Perk", "Coffee Bean"],
+      "correctOption": 2,
+      "durationMs": 10000
+    },
+    {
+      "text": "Friends has the iconic storyline of Ross and Rachel being on a break. What season was this storyline in?",
+      "options": ["Season 2", "Season 3", "Season 4", "Season 5"],
+      "correctOption": 1,
+      "durationMs": 10000
     }
   ]
 }

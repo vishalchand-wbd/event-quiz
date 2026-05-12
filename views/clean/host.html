@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quiz — Host Console</title>
+  <title>Quiz: Host Console</title>
   <!-- favicon -->
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -294,6 +294,55 @@
 
     .hidden { display: none !important; }
 
+    /* Top-10 prompt modal shown when host hits "Start New Game" from finished. */
+    #newgame-modal {
+      border: 1px solid var(--line); border-radius: 14px;
+      padding: 0; max-width: 560px; width: 92vw;
+      background: var(--surface); color: var(--text);
+      box-shadow: var(--shadow);
+    }
+    #newgame-modal::backdrop { background: rgba(14,26,43,0.55); }
+    .newgame-modal-content {
+      padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;
+    }
+    .newgame-modal-content h2 { margin: 0; font-size: 20px; font-weight: 800; }
+    .newgame-modal-sub { margin: 0; color: var(--muted); font-size: 14px; }
+    .newgame-modal-body {
+      max-height: 50vh; overflow-y: auto;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .newgame-row {
+      display: grid; grid-template-columns: 32px 1fr auto;
+      gap: 12px; align-items: center;
+      padding: 10px 4px;
+      border-bottom: 1px solid var(--line);
+    }
+    .newgame-row:last-child { border-bottom: none; }
+    .newgame-row .pos {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--bg); color: var(--text);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+    }
+    .newgame-row .who { min-width: 0; }
+    .newgame-row .who strong {
+      display: block; font-weight: 700; font-size: 14px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .newgame-row .email {
+      display: block; font-size: 12px; color: var(--muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .newgame-row .pts { font-variant-numeric: tabular-nums; font-weight: 700; }
+    .newgame-modal-empty {
+      padding: 22px 6px; color: var(--muted); text-align: center; font-style: italic;
+    }
+    .newgame-modal-actions {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    }
+    .newgame-modal-actions .spacer { flex: 1; }
+
     /* ============================================================
        Stage I — Mobile breakpoint (≤640px).
        Stacks layout into a single column, ensures all action
@@ -410,14 +459,14 @@
         </div>
         <div class="header-meta">
           <span class="badge lobby" id="state-badge"><span class="pulse"></span><span id="state-text">Lobby</span></span>
-          <span class="room-code">Room code:<span class="num" id="host-room-code">—</span></span>
+          <span class="room-code">Room code:<span class="num" id="host-room-code"></span></span>
         </div>
       </div>
 
       <div class="stats">
         <div class="stat">
           <div class="label">Question</div>
-          <div class="value" id="stat-q">—</div>
+          <div class="value" id="stat-q"></div>
         </div>
         <div class="stat">
           <div class="label" id="stat-mid-label">Players Joined</div>
@@ -425,7 +474,7 @@
         </div>
         <div class="stat">
           <div class="label">Time Left</div>
-          <div class="value" id="stat-time">—</div>
+          <div class="value" id="stat-time"></div>
         </div>
       </div>
 
@@ -452,6 +501,20 @@
   </main>
 
   <div id="toast" class="toast"></div>
+
+  <dialog id="newgame-modal">
+    <div class="newgame-modal-content">
+      <h2>Save Top 10 Before Starting New Game</h2>
+      <p class="newgame-modal-sub">Copy these contact details — they'll be wiped when the new game starts.</p>
+      <div id="newgame-modal-body" class="newgame-modal-body"></div>
+      <div class="newgame-modal-actions">
+        <button type="button" class="btn btn-secondary" id="newgame-copy">Copy</button>
+        <div class="spacer"></div>
+        <button type="button" class="btn btn-secondary" id="newgame-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary"   id="newgame-confirm">Start New Game</button>
+      </div>
+    </div>
+  </dialog>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -494,6 +557,7 @@
     // Stage D: tracks game.podiumRevealed flag from state:finished payload +
     // state:podiumRevealed event. Drives the Reveal Podium button visibility.
     let podiumRevealed = false;
+    let lastTop10 = [];
     let timerInterval = null;
     let toastTimer = null;
 
@@ -531,7 +595,7 @@
 
       socket.on('disconnect', () => {
         connStatus.classList.remove('online'); connStatus.classList.add('offline');
-        connText.textContent = 'Disconnected — reconnecting…';
+        connText.textContent = 'Disconnected, reconnecting…';
         updateButtonState();
       });
 
@@ -551,7 +615,7 @@
       });
 
       socket.on('state:meta', (m) => {
-        roomCodeEl.textContent = (m && m.code) || '—';
+        roomCodeEl.textContent = (m && m.code) || '';
       });
 
       socket.on('state:lobby', (p) => {
@@ -560,10 +624,10 @@
         lastReveal = null;
         lastPlayerCount = p.playerCount || 0;
         podiumRevealed = false;
-        statQ.textContent = '—';
+        statQ.textContent = '';
         statMidLab.textContent = 'Players Joined';
         statMid.textContent = lastPlayerCount.toLocaleString();
-        statTime.textContent = '—';
+        statTime.textContent = '';
         qDisplay.classList.add('hidden');
         qDisplay.classList.remove('preview');
         lbWrap.classList.add('hidden');
@@ -580,9 +644,9 @@
         statQ.textContent = `${(q.index || 0) + 1} / ${q.total}`;
         statMidLab.textContent = 'Players Joined';
         statMid.textContent = lastPlayerCount.toLocaleString();
-        statTime.textContent = '—';
+        statTime.textContent = '';
 
-        qMeta.textContent = 'Preview — options hidden from players';
+        qMeta.textContent = 'Preview: options hidden from players';
         renderQuestion(q, null);
         qDisplay.classList.add('preview');
         qDisplay.classList.remove('hidden');
@@ -641,7 +705,7 @@
         lbWrap.classList.remove('hidden');
         statMidLab.textContent = '% Correct';
         statMid.textContent = (r.pctCorrect || 0) + '%';
-        statTime.textContent = '—';
+        statTime.textContent = '';
         stopTimer();
         setBadge('revealed', 'Revealed');
         updateButtonState();
@@ -654,14 +718,15 @@
       socket.on('state:finished', (f) => {
         serverState = 'finished';
         podiumRevealed = !!(f && f.podiumRevealed);
-        statQ.textContent = '—';
+        statQ.textContent = '';
         statMidLab.textContent = 'Game';
         statMid.textContent = 'Done';
-        statTime.textContent = '—';
+        statTime.textContent = '';
         qDisplay.classList.add('hidden');
         qDisplay.classList.remove('preview');
         lbTitle.textContent = 'Final Top 5';
-        renderLeaderboard((f && f.top10) || []);
+        lastTop10 = (f && f.top10) || [];
+        renderLeaderboard(lastTop10);
         lbWrap.classList.remove('hidden');
         setBadge(podiumRevealed ? 'podiumRevealed' : 'finished',
                  podiumRevealed ? 'Podium Revealed' : 'Finished');
@@ -685,16 +750,17 @@
         lastQuestion = null;
         lastReveal = null;
         podiumRevealed = false;
-        showToast('Game reset — back to lobby');
+        lastTop10 = [];
+        showToast('Game reset. Back to lobby.');
       });
     }
 
     function displayName(p) {
-      if (!p) return '—';
+      if (!p) return '';
       const first = (p.firstName || '').trim();
       const last  = (p.lastName  || '').trim();
       const full = (first + ' ' + last).trim();
-      return full || '—';
+      return full || '';
     }
 
     function setBadge(cls, text) {
@@ -769,15 +835,81 @@
       });
     });
 
+    const newgameModal   = document.getElementById('newgame-modal');
+    const newgameBody    = document.getElementById('newgame-modal-body');
+    const newgameCopy    = document.getElementById('newgame-copy');
+    const newgameCancel  = document.getElementById('newgame-cancel');
+    const newgameConfirm = document.getElementById('newgame-confirm');
+
     btnReset.addEventListener('click', () => {
       if (btnReset.disabled) return;
-      const msg = (serverState === 'finished')
-        ? 'Start a new game?\n\nThis clears all players and scores from the previous round so a fresh game can begin. A new room code will be generated.'
-        : 'Reset the game NOW?\n\nThis will clear all players and scores immediately, and rotate the room code. Use this only if the current game is unrecoverable. This cannot be undone.';
-      if (!confirm(msg)) return;
+      if (serverState === 'finished') {
+        openNewGameModal();
+        return;
+      }
+      if (!confirm('Reset the game NOW?\n\nThis will clear all players and scores immediately, and rotate the room code. Use this only if the current game is unrecoverable. This cannot be undone.')) return;
       socket.emit('host:reset', {}, (ack) => {
         if (!ack || !ack.ok) console.warn('reset rejected:', ack && ack.error);
       });
+    });
+
+    function openNewGameModal() {
+      newgameBody.innerHTML = '';
+      if (lastTop10.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'newgame-modal-empty';
+        empty.textContent = 'No players scored in this game.';
+        newgameBody.appendChild(empty);
+      } else {
+        lastTop10.forEach((p, i) => {
+          const row = document.createElement('div');
+          row.className = 'newgame-row';
+          row.innerHTML =
+            `<span class="pos">${i + 1}</span>` +
+            `<span class="who"><strong>${escapeHtml(displayName(p) || '(no name)')}</strong>` +
+              `<span class="email">${escapeHtml(p.email || '')}</span></span>` +
+            `<span class="pts">${(p.score || 0).toLocaleString()}</span>`;
+          newgameBody.appendChild(row);
+        });
+      }
+      if (typeof newgameModal.showModal === 'function') {
+        newgameModal.showModal();
+      } else {
+        newgameModal.setAttribute('open', '');
+      }
+    }
+
+    function closeNewGameModal() {
+      if (typeof newgameModal.close === 'function') newgameModal.close();
+      else newgameModal.removeAttribute('open');
+    }
+
+    newgameCancel.addEventListener('click', closeNewGameModal);
+
+    newgameConfirm.addEventListener('click', () => {
+      closeNewGameModal();
+      socket.emit('host:reset', {}, (ack) => {
+        if (!ack || !ack.ok) console.warn('reset rejected:', ack && ack.error);
+      });
+    });
+
+    newgameCopy.addEventListener('click', async () => {
+      const lines = ['Rank\tName\tEmail\tScore'];
+      lastTop10.forEach((p, i) => {
+        lines.push(`${i + 1}\t${displayName(p)}\t${p.email || ''}\t${p.score || 0}`);
+      });
+      const text = lines.join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Top 10 copied to clipboard');
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); showToast('Top 10 copied to clipboard'); }
+        catch (e) { showToast('Copy failed — select the list manually'); }
+        document.body.removeChild(ta);
+      }
     });
 
     function updateButtonState() {
